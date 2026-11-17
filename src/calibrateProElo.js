@@ -267,6 +267,16 @@ async function calibrateBatch(limit = 100, offset = 0) {
     }
 }
 
-const argLimit = parseInt(process.argv[2] || '50', 10);
-const argOffset = parseInt(process.argv[3] || '0', 10);
-calibrateBatch(argLimit, argOffset).catch(console.error);
+if (require.main === module) {
+    const argLimit = parseInt(process.argv[2] || '50', 10);
+    const argOffset = parseInt(process.argv[3] || '0', 10);
+    calibrateBatch(argLimit, argOffset).catch(console.error);
+}
+
+module.exports = {
+    calibrateBatch,
+    calculateCategoryDiff,
+    fetchOpponentElos,
+    ProEloEngine
+};
+
