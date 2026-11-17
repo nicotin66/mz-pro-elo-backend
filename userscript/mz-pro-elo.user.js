@@ -206,12 +206,12 @@
         async fetchTeamElo(tid) {
             if (this.cache[tid]) return this.cache[tid];
 
-            const cacheKey = `mz_stats_elo_v2_${tid}`;
+            const cacheKey = `mz_stats_elo_v3_${tid}`;
             try {
                 const stored = localStorage.getItem(cacheKey);
                 if (stored) {
                     const parsed = JSON.parse(stored);
-                    if (parsed && parsed.data && (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000)) {
+                    if (parsed && parsed.data && (Date.now() - parsed.timestamp < 10 * 60 * 1000)) {
                         this.cache[tid] = parsed.data;
                         return parsed.data;
                     }
