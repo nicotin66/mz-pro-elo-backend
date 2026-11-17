@@ -1,0 +1,48 @@
+name: MZ Pro-ELO Crawler
+
+on:
+  schedule:
+    # Her 2 saatte bir otomatik çalışır
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Çalışma modu (seed = ilk kurulum, crawl = normal tarama)'
+        required: true
+        default: 'crawl'
+        type: choice
+        options:
+          - crawl
+          - seed
+      scan_limit:
+        description: 'Tek seferde taranacak takım sayısı (crawl modu için)'
+        required: false
+        default: '800'
+
+jobs:
+  run-pro-elo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Depoyu İndir
+        uses: actions/checkout@v4
+
+      - name: Node.js 20 Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: İlk Kurulum (Seed) Çalıştır
+        if: ${{ github.event.inputs.mode == 'seed' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node src/seedFromStats.js
+
+      - name: Sürekli Tarayıcı (Crawler) Çalıştır
+        if: ${{ github.event.inputs.mode != 'seed' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SCAN_LIMIT: ${{ github.event.inputs.scan_limit || '800' }}
+        run: node src/crawler.js
