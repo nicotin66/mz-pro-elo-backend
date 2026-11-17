@@ -2,19 +2,39 @@
 // SUPABASE REST İSTEMCİSİ (Sıfır Bağımlılık - Native Fetch)
 // =====================================================================
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const fs = require('fs');
+const path = require('path');
+try {
+    const envPath = path.resolve(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+        fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+            const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+            if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+        });
+    }
+} catch (e) {}
+
+function getSupabaseUrl() {
+    return (process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co').replace(/\/+$/, '');
+}
+
+const SUPABASE_URL = getSupabaseUrl();
+
+function getSupabaseKey() {
+    return process.env.SUPABASE_SERVICE_KEY || process.env.SERVICE_KEY || '';
+}
 
 function assertEnv() {
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
+    if (!getSupabaseUrl() || !getSupabaseKey()) {
         throw new Error('Eksik ortam değişkeni: SUPABASE_URL ve SUPABASE_SERVICE_KEY tanımlanmalıdır.');
     }
 }
 
 function getHeaders(extra = {}) {
+    const key = getSupabaseKey();
     return {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
         'Content-Type': 'application/json',
         ...extra
     };
