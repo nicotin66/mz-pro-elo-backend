@@ -2,8 +2,8 @@ name: MZ Pro-ELO Crawler
 
 on:
   schedule:
-    # Her 2 saatte bir otomatik çalışır
-    - cron: '0 */2 * * *'
+    # Her saat başı otomatik çalışır
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       mode:
