@@ -206,7 +206,7 @@
         async fetchTeamElo(tid) {
             if (this.cache[tid]) return this.cache[tid];
 
-            const cacheKey = `mz_stats_elo_v3_${tid}`;
+            const cacheKey = `mz_stats_elo_v4_${tid}`;
             try {
                 const stored = localStorage.getItem(cacheKey);
                 if (stored) {
@@ -218,17 +218,7 @@
                 }
             } catch (_) {}
 
-            // 1. Önce kendi bağımsız Supabase veritabanımıza bak
-            const supaData = await this.fetchFromSupabase([tid]);
-            if (supaData && supaData[tid] && (supaData[tid].senior || supaData[tid].u23 || supaData[tid].u21 || supaData[tid].u18)) {
-                this.cache[tid] = supaData[tid];
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: supaData[tid] }));
-                } catch (_) {}
-                return supaData[tid];
-            }
-
-            // 2. Bulunamazsa Statsxente fallback
+            // STATS ELO sütunu her zaman doğrudan orijinal Statsxente'den çekilir (Supabase ile karışmaz)
             const parseVal = (v) => {
                 const n = parseFloat(v);
                 return (!isNaN(n) && n > 0) ? Math.round(n * 10) / 10 : null;
@@ -274,33 +264,19 @@
             });
         },
 
-        // Toplu Rakip ELO Çekici (Önce Supabase toplu, eksikler Statsxente'den)
+        // Toplu Rakip ELO Çekici (Doğrudan Orijinal Statsxente'den)
         async fetchBatchTeamElos(tids) {
             const uniqueTids = [...new Set(tids.filter(id => id && !this.cache[id]))];
             if (uniqueTids.length === 0) return this.cache;
 
-            // 1. Önce Supabase'den topluca al
-            const supaResults = await this.fetchFromSupabase(uniqueTids);
-            const missingTids = [];
-            uniqueTids.forEach(id => {
-                if (supaResults[id]) {
-                    this.cache[id] = supaResults[id];
-                } else {
-                    missingTids.push(id);
-                }
-            });
-
-            if (missingTids.length === 0) return this.cache;
-
-            // 2. Veritabanında henüz olmayan yeni takımları Statsxente'den tamamla
             const parseVal = (v) => {
                 const n = parseFloat(v);
                 return (!isNaN(n) && n > 0) ? Math.round(n * 10) / 10 : null;
             };
 
             const chunkSize = 25;
-            for (let i = 0; i < missingTids.length; i += chunkSize) {
-                const chunk = missingTids.slice(i, i + chunkSize);
+            for (let i = 0; i < uniqueTids.length; i += chunkSize) {
+                const chunk = uniqueTids.slice(i, i + chunkSize);
                 const query = chunk.map((id, idx) => `&idEquipo${idx}=${id}`).join('');
                 const url = `https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer${query}`;
 
