@@ -90,8 +90,16 @@ function computeMatchDelta(homeElo, awayElo, homeGoals, awayGoals, rawType, type
     const actualHome = homeGoals > awayGoals ? 1 : (homeGoals < awayGoals ? 0 : 0.5);
     const g = getGoalMultiplier(homeGoals - awayGoals, info.useGoalMult, oppMissing);
 
-    const homeDelta = Number((info.k * g * (actualHome - expHome)).toFixed(2));
-    const awayDelta = Number((-homeDelta).toFixed(2));
+    let homeDelta = Number((info.k * g * (actualHome - expHome)).toFixed(2));
+    let awayDelta = Number((-homeDelta).toFixed(2));
+
+    // FIFA Knockout Rule: Kupa eleme turlarında (Play-off / Knockout) kaybeden takımdan puan düşülmez (0 Ceza!)
+    const isPlayoff = (rawType || '').toLowerCase().includes('playoff') || info.kind === 'cup_playoff' || (rawType || '').toLowerCase().includes('private_cup_playoff');
+    if (isPlayoff) {
+        if (homeDelta < 0) homeDelta = 0;
+        if (awayDelta < 0) awayDelta = 0;
+    }
+
     return { age: info.age, k: info.k, homeDelta, awayDelta };
 }
 

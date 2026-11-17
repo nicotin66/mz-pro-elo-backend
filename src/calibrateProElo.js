@@ -133,7 +133,14 @@ function calculateCategoryDiff(cat, baseElo, matches, oppElosMap, tid) {
         const statsK = isFriendlySeries ? 10 : (t.includes('private_cup') ? 15 : 30);
 
         const statsDelta = statsK * (actual - expected);
-        const proDelta = kPro * gMult * (actual - expected);
+        let proDelta = kPro * gMult * (actual - expected);
+
+        // FIFA Knockout Rule: Kupa eleme maçlarında (playoff) yenilgide ceza = 0!
+        const isPlayoff = t.includes('cup_playoff') || t.includes('playoff') || t.includes('private_cup_playoff');
+        if (isPlayoff && actual < 0.5) {
+            proDelta = 0; // Kaybeden takım Pro-ELO'da 0 ceza alır (Puanı düşmez)
+        }
+
         officialNetDiff += (proDelta - statsDelta);
     }
 
