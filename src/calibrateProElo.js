@@ -1,19 +1,26 @@
 // =====================================================================
 // PRO-ELO KALİBRASYON MOTORU (30 GÜNLÜK GERÇEK MAÇ KALİBRASYONU)
-// Statsxente ham başlangıç puanları üzerine, takımın son 30 günlük
-// resmi maçlarındaki Lig Ağırlığı, Kupa Aşaması ve Gol Farkı çarpanlarını
-// hesaplayarak gerçek PRO-ELO v1.0 puanını üretir.
+// Rakiplerin ELO verilerini tıpkı Tampermonkey betiğimiz gibi önce
+// kendi canlı Supabase Pro-ELO depomuzdan çeker.
 // =====================================================================
+
+const fs = require('fs');
+const path = require('path');
+try {
+    const envPath = path.resolve(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+        fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+            const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+            if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+        });
+    }
+} catch (e) {}
 
 const { parseMatchlistXml } = require('./proEloEngine');
 const { upsertTeams } = require('./supabaseClient');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co';
+const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co').replace(/\/+$/, '');
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SERVICE_KEY || '';
-
-// Environment variable yoksa process.env'e ata
-process.env.SUPABASE_URL = SUPABASE_URL;
-process.env.SUPABASE_SERVICE_KEY = SERVICE_KEY;
 
 const ProEloEngine = {
     getGoalDiffMultiplier(goalDiff, eloDiff) {
@@ -57,28 +64,63 @@ async function fetchMatchlist(tid) {
     }
 }
 
+// Rakipleri tıpkı Userscript gibi önce Supabase'den, eksikleri Statsxente'den çeker
 async function fetchOpponentElos(tids) {
     const map = new Map();
-    const chunkSize = 25;
+    const missingTids = [];
+
+    // 1. Önce Supabase'den topluca al
+    const chunkSize = 100;
     for (let i = 0; i < tids.length; i += chunkSize) {
         const chunk = tids.slice(i, i + chunkSize);
-        const params = chunk.map((id, idx) => `idEquipo${idx}=${id}`).join('&');
-        const url = `https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer&${params}`;
         try {
-            const res = await fetch(url);
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?tid=in.(${chunk.join(',')})&select=tid,senior_elo,u23_elo,u21_elo,u18_elo`, {
+                headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
+            });
             const data = await res.json();
-            if (data && data.teams) {
-                for (const [idStr, obj] of Object.entries(data.teams)) {
-                    map.set(parseInt(idStr, 10), {
-                        senior: parseFloat(obj.SENIOR) || null,
-                        u23: parseFloat(obj.U23) || null,
-                        u21: parseFloat(obj.U21) || null,
-                        u18: parseFloat(obj.U18) || null
+            if (Array.isArray(data)) {
+                const foundTids = new Set();
+                data.forEach(t => {
+                    foundTids.add(t.tid);
+                    map.set(t.tid, {
+                        senior: t.senior_elo,
+                        u23: t.u23_elo,
+                        u21: t.u21_elo,
+                        u18: t.u18_elo
                     });
-                }
+                });
+                chunk.forEach(id => {
+                    if (!foundTids.has(id)) missingTids.push(id);
+                });
             }
-        } catch (e) {}
+        } catch (e) {
+            missingTids.push(...chunk);
+        }
     }
+
+    // 2. Bulunamayan takımları Statsxente'den tamamla
+    if (missingTids.length > 0) {
+        const statsChunk = 25;
+        for (let i = 0; i < missingTids.length; i += statsChunk) {
+            const chunk = missingTids.slice(i, i + statsChunk);
+            const params = chunk.map((id, idx) => `idEquipo${idx}=${id}`).join('&');
+            try {
+                const res = await fetch(`https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer&${params}`);
+                const data = await res.json();
+                if (data && data.teams) {
+                    for (const [idStr, obj] of Object.entries(data.teams)) {
+                        map.set(parseInt(idStr, 10), {
+                            senior: parseFloat(obj.SENIOR) || null,
+                            u23: parseFloat(obj.U23) || null,
+                            u21: parseFloat(obj.U21) || null,
+                            u18: parseFloat(obj.U18) || null
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+    }
+
     return map;
 }
 
@@ -91,10 +133,15 @@ function calculateCategoryDiff(cat, baseElo, matches, oppElosMap, tid) {
         const tn = (m.typeName || '').toLowerCase();
         if (t === 'friendly' || t.includes('scout') || t === 'special') continue;
 
+        const isCat = (age) => {
+            const re = new RegExp('(?:^|[^a-z0-9])u-?' + age + '(?:$|[^a-z0-9])');
+            return t.includes('u' + age) || re.test(t) || re.test(tn);
+        };
+
         let matchCat = 'senior';
-        if (t.includes('u18') || /\bu-?18\b/.test(tn)) matchCat = 'u18';
-        else if (t.includes('u21') || /\bu-?21\b/.test(tn)) matchCat = 'u21';
-        else if (t.includes('u23') || /\bu-?23\b/.test(tn)) matchCat = 'u23';
+        if (isCat('18')) matchCat = 'u18';
+        else if (isCat('21')) matchCat = 'u21';
+        else if (isCat('23')) matchCat = 'u23';
 
         if (matchCat !== cat) continue;
         matchCount++;
@@ -174,16 +221,26 @@ async function calibrateBatch(limit = 100, offset = 0) {
             const allTidsToFetch = [t.tid, ...new Set(matches.map(m => m.home.tid === t.tid ? m.away.tid : m.home.tid))];
             const oppElos = await fetchOpponentElos(allTidsToFetch);
 
-            const selfObj = oppElos.get(t.tid) || {};
-            const baseSenior = selfObj.senior != null ? selfObj.senior : t.senior_elo;
-            const baseU23 = selfObj.u23 != null ? selfObj.u23 : t.u23_elo;
-            const baseU21 = selfObj.u21 != null ? selfObj.u21 : t.u21_elo;
-            const baseU18 = selfObj.u18 != null ? selfObj.u18 : t.u18_elo;
+            // Başlangıç çapasını al
+            let baseStats = { senior: 1911.6, u23: 1048.5, u21: 1411.5, u18: 1755.4 };
+            try {
+                const sRes = await fetch(`https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer&idEquipo0=${t.tid}`);
+                const sData = await sRes.json();
+                if (sData && sData.teams && sData.teams[t.tid]) {
+                    const obj = sData.teams[t.tid];
+                    baseStats = {
+                        senior: parseFloat(obj.SENIOR) || t.senior_elo,
+                        u23: parseFloat(obj.U23) || t.u23_elo,
+                        u21: parseFloat(obj.U21) || t.u21_elo,
+                        u18: parseFloat(obj.U18) || t.u18_elo
+                    };
+                }
+            } catch (e) {}
 
-            const seniorRes = calculateCategoryDiff('senior', baseSenior, matches, oppElos, t.tid);
-            const u23Res = calculateCategoryDiff('u23', baseU23, matches, oppElos, t.tid);
-            const u21Res = calculateCategoryDiff('u21', baseU21, matches, oppElos, t.tid);
-            const u18Res = calculateCategoryDiff('u18', baseU18, matches, oppElos, t.tid);
+            const seniorRes = calculateCategoryDiff('senior', baseStats.senior, matches, oppElos, t.tid);
+            const u23Res = calculateCategoryDiff('u23', baseStats.u23, matches, oppElos, t.tid);
+            const u21Res = calculateCategoryDiff('u21', baseStats.u21, matches, oppElos, t.tid);
+            const u18Res = calculateCategoryDiff('u18', baseStats.u18, matches, oppElos, t.tid);
 
             updatedRows.push({
                 tid: t.tid,
@@ -197,7 +254,7 @@ async function calibrateBatch(limit = 100, offset = 0) {
                 updated_at: new Date().toISOString()
             });
 
-            console.log(`  [${i + 1}/${teams.length}] ${t.name} (#${t.tid}) -> Senior: ${baseSenior} + (${seniorRes.adj}) = ${seniorRes.finalElo}`);
+            console.log(`  [${i + 1}/${teams.length}] ${t.name} (#${t.tid}) -> Senior: ${baseStats.senior} + (${seniorRes.adj}) = ${seniorRes.finalElo}`);
         }
     }
 
