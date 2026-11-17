@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MZ Pro-ELO Dünya Sıralaması & İstatistik Laboratuvarı</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-card: #182234;
+            --border: #334155;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --gold: #f59e0b;
+            --silver: #cbd5e1;
+            --bronze: #b45309;
+            --win: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Üst Başlık */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge-live {
+            background: #065f46;
+            color: #34d399;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid #059669;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* İstatistik Kartları */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .stat-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Filtre ve Kontrol Alanı */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            background: var(--bg-surface);
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary-hover);
+        }
+
+        .search-box {
+            position: relative;
+            min-width: 260px;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            padding: 8px 14px 8px 36px;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Tablo Alanı */
+        .table-wrap {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: rgba(15, 23, 42, 0.7);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+            color: var(--text-main);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 12px;
+        }
+
+        .rank-1 { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+        .rank-2 { background: rgba(203, 213, 225, 0.15); color: #e2e8f0; border: 1px solid rgba(203, 213, 225, 0.3); }
+        .rank-3 { background: rgba(180, 83, 9, 0.2); color: #f97316; border: 1px solid rgba(180, 83, 9, 0.4); }
+        .rank-other { color: var(--text-muted); font-weight: 700; }
+
+        .team-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .team-link {
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 700;
+            transition: color 0.15s;
+        }
+
+        .team-link:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .team-tid {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .elo-pill {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-weight: 800;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .loading-state {
+            padding: 50px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .page-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .page-btn {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-btn:not(:disabled):hover {
+            background: var(--primary);
+            border-color: var(--primary-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">
+                <h1>
+                    <span>⚽ MZ Pro-ELO İstatistik & Dünya Sıralaması</span>
+                    <span class="badge-live">Canlı Veritabanı</span>
+                </h1>
+                <p>ManagerZone için tamamen bağımsız, resmi lig zorluğu ve kupa çarpanlarıyla hesaplanan Pro-ELO motoru.</p>
+            </div>
+            <a href="https://github.com/nicotin66/mz-pro-elo-backend" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 12px; font-weight: 600;">
+                GitHub Deposu ↗
+            </a>
+        </div>
+
+        <!-- İstatistik Kartları -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Taranan Toplam Takım</div>
+                <div class="stat-value" id="stat-teams">...</div>
+                <div class="stat-desc">Dünya geneli taranan aktif kulüpler</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Hesaplanan Toplam Maç</div>
+                <div class="stat-value" id="stat-matches" style="color: #38bdf8;">...</div>
+                <div class="stat-desc">Son 35 günde işlenen resmi maçlar</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Dünya #1 Senior Takımı</div>
+                <div class="stat-value" id="stat-top-team" style="font-size: 18px; color: #fbbf24;">...</div>
+                <div class="stat-desc" id="stat-top-elo">Senior ELO: ...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Otomatik Bot Döngüsü</div>
+                <div class="stat-value" style="color: #4ade80; font-size: 20px;">Her 1 Saat</div>
+                <div class="stat-desc">GitHub Actions ile 7/24 kesintisiz</div>
+            </div>
+        </div>
+
+        <!-- Filtre ve Kontroller -->
+        <div class="controls">
+            <div class="tabs">
+                <button class="tab-btn active" data-cat="senior_elo">🏆 Senior (A Takım)</button>
+                <button class="tab-btn" data-cat="u23_elo">🥉 U23</button>
+                <button class="tab-btn" data-cat="u21_elo">🥈 U21</button>
+                <button class="tab-btn" data-cat="u18_elo">🥇 U18</button>
+            </div>
+            <div class="search-box">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="searchInput" placeholder="Takım adı veya ID ara...">
+            </div>
+        </div>
+
+        <!-- Tablo -->
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">Sıra</th>
+                        <th>Takım Bilgisi</th>
+                        <th style="width: 140px; text-align: right;">Pro-ELO Puanı</th>
+                        <th style="width: 100px; text-align: center;">Profil</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="4" class="loading-state">Veritabanından canlı ELO sıralaması yükleniyor...</td></tr>
+                </tbody>
+            </table>
+
+            <div class="pagination">
+                <div id="pageInfo">Sayfa 1 / ...</div>
+                <div class="page-btns">
+                    <button class="page-btn" id="prevBtn" disabled>Önceki</button>
+                    <button class="page-btn" id="nextBtn">Sonraki</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://bggydqalllytcqwxsypj.supabase.co';
+        const ANON_KEY = 'sb_publishable_STh8YlqTIwHyCCNP9YFp_Q_YF3TpRKC';
+
+        let currentCategory = 'senior_elo';
+        let currentPage = 1;
+        const PAGE_SIZE = 50;
+        let searchQuery = '';
+        let totalTeams = 0;
+
+        async function fetchCounts() {
+            try {
+                const [tRes, mRes] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/rest/v1/mz_teams?select=count`, {
+                        headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+                    }).then(r => r.json()),
+                    fetch(`${SUPABASE_URL}/rest/v1/mz_processed_matches?select=count`, {
+                        headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+                    }).then(r => r.json())
+                ]);
+                totalTeams = tRes[0].count;
+                document.getElementById('stat-teams').textContent = totalTeams.toLocaleString('tr-TR');
+                document.getElementById('stat-matches').textContent = mRes[0].count.toLocaleString('tr-TR');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadRankings() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="loading-state">Yükleniyor...</td></tr>';
+
+            const offset = (currentPage - 1) * PAGE_SIZE;
+            let url = `${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country,${currentCategory}&order=${currentCategory}.desc&limit=${PAGE_SIZE}&offset=${offset}`;
+            
+            if (searchQuery.trim()) {
+                const q = encodeURIComponent(searchQuery.trim());
+                if (/^\d+$/.test(searchQuery.trim())) {
+                    url += `&tid=eq.${q}`;
+                } else {
+                    url += `&name=ilike.*${q}*`;
+                }
+            }
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+                });
+                const teams = await res.json();
+
+                if (!teams.length) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="loading-state">Kayıt bulunamadı.</td></tr>';
+                    return;
+                }
+
+                // 1. sıradaki takımı istatistiğe bas
+                if (currentPage === 1 && !searchQuery) {
+                    document.getElementById('stat-top-team').textContent = teams[0].name || `Takım #${teams[0].tid}`;
+                    document.getElementById('stat-top-elo').textContent = `Senior ELO: ${Number(teams[0][currentCategory]).toFixed(1)}`;
+                }
+
+                tbody.innerHTML = '';
+                teams.forEach((t, i) => {
+                    const globalRank = offset + i + 1;
+                    let rankBadge = `<span class="rank-badge rank-other">${globalRank}</span>`;
+                    if (globalRank === 1) rankBadge = `<span class="rank-badge rank-1">🥇 1</span>`;
+                    else if (globalRank === 2) rankBadge = `<span class="rank-badge rank-2">🥈 2</span>`;
+                    else if (globalRank === 3) rankBadge = `<span class="rank-badge rank-3">🥉 3</span>`;
+
+                    const eloVal = t[currentCategory] ? Number(t[currentCategory]).toFixed(1) : '-';
+                    const mzLink = `https://www.managerzone.com/?p=team&tid=${t.tid}`;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${rankBadge}</td>
+                        <td>
+                            <div class="team-cell">
+                                <div>
+                                    <a class="team-link" href="${mzLink}" target="_blank">${t.name || 'İsimsiz Kulüp'}</a>
+                                    <div class="team-tid">ID: ${t.tid} ${t.country ? '• ' + t.country : ''}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="text-align: right;">
+                            <span class="elo-pill">${eloVal}</span>
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="${mzLink}" target="_blank" style="color: #94a3b8; font-size: 16px; text-decoration: none;">↗</a>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('pageInfo').textContent = `Sayfa ${currentPage} (Gösterilen: ${offset + 1} - ${offset + teams.length})`;
+                document.getElementById('prevBtn').disabled = currentPage === 1;
+                document.getElementById('nextBtn').disabled = teams.length < PAGE_SIZE;
+
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="4" class="loading-state" style="color: #ef4444;">Veri yüklenirken hata oluştu.</td></tr>';
+            }
+        }
+
+        // Kategori Değişimi
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCategory = btn.dataset.cat;
+                currentPage = 1;
+                loadRankings();
+            });
+        });
+
+        // Arama (Debounced)
+        let debounceTimer;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                searchQuery = e.target.value;
+                currentPage = 1;
+                loadRankings();
+            }, 300);
+        });
+
+        // Sayfalama
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadRankings();
+            }
+        });
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            currentPage++;
+            loadRankings();
+        });
+
+        fetchCounts();
+        loadRankings();
+    </script>
+</body>
+</html>
