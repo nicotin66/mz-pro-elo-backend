@@ -2,27 +2,28 @@ name: MZ Pro-ELO Crawler
 
 on:
   schedule:
-    # Yedek tetikleyici (asıl kesin saat başı tetikleme cron-job.org üzerinden workflow_dispatch ile yapılır)
+    # Yedek tetikleyici (asıl saat başı tetikleme cron-job.org üzerinden workflow_dispatch ile yapılır)
     - cron: '37 */2 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Çalışma modu (refresh = çift model yenileme, snapshot = tek seferlik anlık kayıt, seed = ilk kurulum)'
+        description: 'Çalışma modu (refresh = saatlik çift-model, discover = 100 ülke lig keşfi, snapshot = anlık çapa, seed = ilk kurulum)'
         required: false
         default: 'refresh'
         type: choice
         options:
           - refresh
+          - discover
           - snapshot
           - seed
       top_limit:
-        description: 'Her koşuda mutlaka yenilenecek en üst hibrit takım sayısı'
+        description: 'Her saat mutlaka yenilenecek en üst hibrit takım sayısı'
         required: false
-        default: '300'
+        default: '400'
       rotate_limit:
-        description: 'Sırayla yenilenecek takım sayısı'
+        description: 'Aktif takımlardan her saat sırayla yenilenecek takım sayısı'
         required: false
-        default: '750'
+        default: '9000'
 
 concurrency:
   group: pro-elo-refresh
@@ -48,6 +49,13 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node src/seedFromStats.js
 
+      - name: 100 Ülke Lig Keşfi (discover)
+        if: ${{ github.event.inputs.mode == 'discover' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node src/discoverAllCountries.js
+
       - name: Tek seferlik Statsxente anlık kaydı (snapshot)
         if: ${{ github.event.inputs.mode == 'snapshot' }}
         env:
@@ -56,10 +64,12 @@ jobs:
         run: node src/snapshotAll.js
 
       - name: Çift Model Pro-ELO yenileme (Hibrit + Bağımsız)
-        if: ${{ github.event.inputs.mode != 'seed' && github.event.inputs.mode != 'snapshot' }}
+        if: ${{ github.event.inputs.mode != 'seed' && github.event.inputs.mode != 'snapshot' && github.event.inputs.mode != 'discover' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          TOP_LIMIT: ${{ github.event.inputs.top_limit || '300' }}
-          ROTATE_LIMIT: ${{ github.event.inputs.rotate_limit || '750' }}
+          TOP_LIMIT: ${{ github.event.inputs.top_limit || '400' }}
+          IND_TOP_LIMIT: '200'
+          ROTATE_LIMIT: ${{ github.event.inputs.rotate_limit || '9000' }}
+          CONCURRENCY: '12'
         run: node src/refresh.js

@@ -1,14 +1,11 @@
 // =====================================================================
-// PRO-ELO SAATLİK ÇİFT-MODEL YENİLEYİCİ (Model 1 + Model 2)
+// PRO-ELO SAATLİK YÜKSEK HIZLI ÇİFT-MODEL YENİLEYİCİ (Model 1 + Model 2)
 // ---------------------------------------------------------------------
-// MODEL 1 (Hibrit — Stats + Fark):
-//   Betikle birebir aynı formül: Canlı Statsxente ELO + 30 günlük maç
-//   farkı -> senior_elo, u23_elo, u21_elo, u18_elo
-//
-// MODEL 2 (Bağımsız — 18.11.2026 Çapalı):
-//   snapshot_cutoff (MZ Stockholm saati) tarihinden SONRA oynanan her
-//   maçı kronolojik sırayla ve YALNIZCA 1 KEZ (mz_ind_matches kontrollü)
-//   işler; bir daha Statsxente'ye bakmadan ind_*_elo üzerine ekler.
+// - Ölü/bot takımları atlar, YALNIZCA aktif (~17.500) kulüpleri döner.
+// - Sayfalamalı kuyruk (1.000'erli): saatte ~9.500 aktif takım (~10 dk)
+//   -> En üst 600 takım HER SAAT, tüm aktif dünya 2 SAATTE 1 yenilenir!
+// - MODEL 1 (Hibrit): Canlı Statsxente + 30 günlük maç farkı (betikle aynı)
+// - MODEL 2 (Bağımsız): 18.11.2026 çapası + sonrası tekil maçlar
 // =====================================================================
 
 const { parseMatchlistXml } = require('./proEloEngine');
@@ -31,10 +28,10 @@ const {
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co').replace(/\/+$/, '');
 const KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SERVICE_KEY || '';
-const TOP_LIMIT = parseInt(process.env.TOP_LIMIT || '300', 10);
-const IND_TOP_LIMIT = parseInt(process.env.IND_TOP_LIMIT || '150', 10);
-const ROTATE_LIMIT = parseInt(process.env.ROTATE_LIMIT || '750', 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || '6', 10);
+const TOP_LIMIT = parseInt(process.env.TOP_LIMIT || '400', 10);
+const IND_TOP_LIMIT = parseInt(process.env.IND_TOP_LIMIT || '200', 10);
+const ROTATE_LIMIT = parseInt(process.env.ROTATE_LIMIT || '9000', 10);
+const CONCURRENCY = parseInt(process.env.CONCURRENCY || '12', 10);
 const ONLY_TIDS = (process.env.ONLY_TIDS || '').split(',').map(s => parseInt(s, 10)).filter(Boolean);
 
 const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
@@ -46,7 +43,7 @@ async function fetchJson(url, opts = {}, retries = 2) {
             const res = await fetch(url, opts);
             if (res.ok) return await res.json();
         } catch (_) {}
-        await sleep(800 * (i + 1));
+        await sleep(700 * (i + 1));
     }
     return null;
 }
@@ -57,30 +54,60 @@ async function fetchText(url, retries = 2) {
             const res = await fetch(url);
             if (res.ok) return await res.text();
         } catch (_) {}
-        await sleep(800 * (i + 1));
+        await sleep(700 * (i + 1));
     }
     return null;
 }
 
+// Supabase PostgREST tek istekte 1000 satır sınırı olduğundan sayfalamalı çekim
+async function fetchPaged(baseQuery, totalWanted) {
+    const out = [];
+    const pageSize = 1000;
+    let offset = 0;
+    while (out.length < totalWanted) {
+        const take = Math.min(pageSize, totalWanted - out.length);
+        const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/${baseQuery}&limit=${take}&offset=${offset}`, { headers });
+        if (!Array.isArray(rows) || rows.length === 0) break;
+        out.push(...rows);
+        if (rows.length < take) break;
+        offset += take;
+    }
+    return out;
+}
+
 // ---- Statsxente (koşu boyunca önbellekli, 25'li paketler) ----
 const statsCache = new Map();
+const inFlightStats = new Map();
 async function ensureStats(tids) {
-    const missing = [...new Set(tids.map(Number))].filter(id => id && !statsCache.has(id));
+    const missing = [...new Set(tids.map(Number))].filter(id => id && !statsCache.has(id) && !inFlightStats.has(id));
+    if (missing.length === 0) {
+        const pending = [...new Set(tids.map(Number))].map(id => inFlightStats.get(id)).filter(Boolean);
+        if (pending.length) await Promise.all(pending);
+        return;
+    }
+
+    const promises = [];
     for (let i = 0; i < missing.length; i += 25) {
         const chunk = missing.slice(i, i + 25);
         const q = chunk.map((id, idx) => `&idEquipo${idx}=${id}`).join('');
-        const data = await fetchJson(`https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer${q}`);
-        const teams = (data && data.teams) ? data.teams : (data || {});
-        chunk.forEach(id => {
-            const t = teams[id] || teams[String(id)] || {};
-            statsCache.set(id, {
-                senior: parseVal(t.SENIOR || t.senior),
-                u23: parseVal(t.U23 || t.u23),
-                u21: parseVal(t.U21 || t.u21),
-                u18: parseVal(t.U18 || t.u18)
+        const p = (async () => {
+            const data = await fetchJson(`https://statsxente.com/MZ1/Functions/tamper_elo_values.php?sport=soccer${q}`);
+            const teams = (data && data.teams) ? data.teams : (data || {});
+            chunk.forEach(id => {
+                const t = teams[id] || teams[String(id)] || {};
+                statsCache.set(id, {
+                    senior: parseVal(t.SENIOR || t.senior),
+                    u23: parseVal(t.U23 || t.u23),
+                    u21: parseVal(t.U21 || t.u21),
+                    u18: parseVal(t.U18 || t.u18)
+                });
+                inFlightStats.delete(id);
             });
-        });
+        })();
+        chunk.forEach(id => inFlightStats.set(id, p));
+        promises.push(p);
     }
+    await Promise.all(promises);
 }
 
 async function pickQueue(hasIndColumns) {
@@ -88,18 +115,28 @@ async function pickQueue(hasIndColumns) {
         return await fetchJson(`${SUPABASE_URL}/rest/v1/mz_teams?tid=in.(${ONLY_TIDS.join(',')})&select=tid,name,country`, { headers }) || [];
     }
     const map = new Map();
-    const topHybrid = await fetchJson(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country&order=senior_elo.desc.nullslast&limit=${TOP_LIMIT}`, { headers }) || [];
+
+    // 1) En üst Hibrit takımlar (her saat mutlaka)
+    const topHybrid = await fetchPaged('mz_teams?select=tid,name,country&order=senior_elo.desc.nullslast', TOP_LIMIT);
     topHybrid.forEach(t => map.set(Number(t.tid), t));
 
+    // 2) En üst Bağımsız takımlar (her saat mutlaka)
     if (hasIndColumns && IND_TOP_LIMIT > 0) {
-        const topInd = await fetchJson(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country&order=ind_senior_elo.desc.nullslast&limit=${IND_TOP_LIMIT}`, { headers }) || [];
+        const topInd = await fetchPaged('mz_teams?select=tid,name,country&order=ind_senior_elo.desc.nullslast', IND_TOP_LIMIT);
         topInd.forEach(t => {
             if (!map.has(Number(t.tid))) map.set(Number(t.tid), t);
         });
     }
 
+    // 3) Aktif takımlardan en uzun süredir taranmamış olanlar (bot/ölü kulüpler hariç!)
+    const activeFilter = hasIndColumns
+        ? '&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null,senior_elo.not.is.null)'
+        : '&senior_elo=not.is.null';
     const targetTotal = map.size + ROTATE_LIMIT;
-    const rot = await fetchJson(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country&order=last_scanned_at.asc.nullsfirst&limit=${ROTATE_LIMIT + map.size}`, { headers }) || [];
+    const rot = await fetchPaged(
+        `mz_teams?select=tid,name,country${activeFilter}&order=last_scanned_at.asc.nullsfirst`,
+        ROTATE_LIMIT + map.size
+    );
     for (const t of rot) {
         if (map.size >= targetTotal) break;
         if (!map.has(Number(t.tid))) map.set(Number(t.tid), t);
@@ -111,7 +148,6 @@ async function main() {
     if (!KEY) throw new Error('SUPABASE_SERVICE_KEY tanımlı değil');
     const started = Date.now();
 
-    // v2 meta kontrolü (migration çalıştırılmadıysa bile Model 1 çalışmaya devam eder)
     let meta = {};
     let hasV2 = false;
     try {
@@ -123,11 +159,11 @@ async function main() {
     const snapshotCutoff = meta.snapshot_cutoff || null;
 
     const queue = await pickQueue(hasV2);
-    console.log(`[1/4] ${queue.length} takım taranacak (top=${TOP_LIMIT}, indTop=${hasV2 ? IND_TOP_LIMIT : 0}, rotasyon=${ROTATE_LIMIT}, çapa=${snapshotCutoff || 'YOK'})`);
+    console.log(`[1/4] ${queue.length} AKTİF takım taranacak (top=${TOP_LIMIT}, indTop=${hasV2 ? IND_TOP_LIMIT : 0}, rotasyon=${ROTATE_LIMIT}, paralel=${CONCURRENCY}, çapa=${snapshotCutoff || 'YOK'})`);
 
-    const hybridResults = new Map(); // tid -> Model 1 hesap sonuçları
-    const discovered = new Map();    // tid -> { name, country }
-    const allSeenMatches = new Map();// mid -> rawMatch
+    const hybridResults = new Map();    // tid -> Model 1 hesap sonuçları
+    const discovered = new Map();       // tid -> { name, country }
+    const postCutoffMatches = new Map();// Sadece çapa sonrası maçlar (RAM tasarrufu!)
     let idx = 0, done = 0;
 
     async function worker() {
@@ -156,7 +192,9 @@ async function main() {
                     if (!d.name && opp.name) d.name = opp.name;
                     if (!d.country && opp.country) d.country = opp.country;
                 }
-                if (!allSeenMatches.has(m.mid)) allSeenMatches.set(m.mid, m);
+                if (snapshotCutoff && m.date && String(m.date) >= snapshotCutoff && !postCutoffMatches.has(m.mid)) {
+                    postCutoffMatches.set(m.mid, m);
+                }
             }
 
             // ---- MODEL 1 (Hibrit: Canlı Statsxente + 30 günlük Pro-Stats farkı) ----
@@ -180,8 +218,9 @@ async function main() {
             });
 
             done++;
-            if (done % 100 === 0 || ONLY_TIDS.length) {
-                console.log(`  ${done}/${queue.length} | ${name} (#${tid}) Hibrit Senior: ${selfStats.senior} ${r.senior.adjustment >= 0 ? '+' : ''}${r.senior.adjustment} = ${r.senior.proElo}`);
+            if (done % 500 === 0 || ONLY_TIDS.length) {
+                const elapsed = Math.round((Date.now() - started) / 1000);
+                console.log(`  ${done}/${queue.length} (${elapsed}s) | ${name} (#${tid}) Hibrit Senior: ${selfStats.senior} ${r.senior.adjustment >= 0 ? '+' : ''}${r.senior.adjustment} = ${r.senior.proElo}`);
             }
         }
     }
@@ -190,12 +229,7 @@ async function main() {
     // ---- MODEL 2 (Bağımsız: snapshotCutoff sonrası tekil maçlar) ----
     let newIndMatches = [];
     if (hasV2 && snapshotCutoff) {
-        const candidates = [];
-        for (const m of allSeenMatches.values()) {
-            if (m.date && String(m.date) >= snapshotCutoff) {
-                candidates.push(m);
-            }
-        }
+        const candidates = [...postCutoffMatches.values()];
         if (candidates.length > 0) {
             const alreadyProcessed = await fetchIndProcessedMids(candidates.map(m => m.mid));
             newIndMatches = candidates
@@ -207,7 +241,6 @@ async function main() {
         console.log('[2/4] Model 2 (Bağımsız): Çapa henüz alınmadığı için atlandı.');
     }
 
-    // Etkilenecek tüm takımların mevcut kayıtlarını Supabase'den çek (veri ezilmesini sıfırlar)
     const allInvolvedTids = new Set(hybridResults.keys());
     for (const m of newIndMatches) {
         allInvolvedTids.add(Number(m.home.tid));
@@ -217,7 +250,7 @@ async function main() {
     const dirtyTids = new Set();
     const nowIso = new Date().toISOString();
 
-    // Model 2 için henüz çapa almamış (yeni keşfedilmiş) takımlar varsa 1 kerelik Statsxente çapası al
+    // Model 2 için henüz çapa almamış yeni takımlar varsa 1 kerelik Statsxente çapası al
     if (hasV2 && newIndMatches.length > 0) {
         const needSnapTids = [];
         for (const m of newIndMatches) {
@@ -322,7 +355,7 @@ async function main() {
         });
     }
 
-    // Model 1 sonuçlarını teamStateMap üzerine güvenle birleştir (snap_* ve ind_* korunur!)
+    // Model 1 sonuçlarını güvenle birleştir (snap_* ve ind_* korunur!)
     for (const [tid, h] of hybridResults.entries()) {
         const existing = teamStateMap.get(tid);
         if (existing) {
@@ -378,12 +411,12 @@ async function main() {
         await insertIndMatches(indMatchRows);
     }
 
-    // Yeni keşfedilen rakipleri (Statsxente kaydı olanları) kuyruğa ekle (zaten varsa dokunulmaz)
+    // Yeni keşfedilen aktif rakipleri (Statsxente kaydı olanları) ekle
     const newRows = [];
     for (const [tid, info] of discovered.entries()) {
         if (teamStateMap.has(tid)) continue;
         const s = statsCache.get(tid);
-        if (!s || s.senior === null) continue;
+        if (!s || (s.senior === null && s.u23 === null && s.u21 === null && s.u18 === null)) continue;
         const row = {
             tid,
             name: info.name || '',

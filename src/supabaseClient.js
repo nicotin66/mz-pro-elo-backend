@@ -40,13 +40,32 @@ function getHeaders(extra = {}) {
     };
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function fetchRetry(url, opts = {}, retries = 3) {
+    let lastErr;
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const res = await fetch(url, opts);
+            if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) {
+                return res;
+            }
+            lastErr = new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+        } catch (err) {
+            lastErr = err;
+        }
+        if (i < retries) await sleep(800 * (i + 1));
+    }
+    throw lastErr;
+}
+
 async function upsertTeams(rows) {
     assertEnv();
     if (!rows.length) return;
-    const chunkSize = 400;
+    const chunkSize = 300;
     for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?on_conflict=tid`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_teams?on_conflict=tid`, {
             method: 'POST',
             headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
             body: JSON.stringify(chunk)
@@ -60,10 +79,10 @@ async function upsertTeams(rows) {
 async function insertMissingTeams(rows) {
     assertEnv();
     if (!rows.length) return;
-    const chunkSize = 400;
+    const chunkSize = 300;
     for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?on_conflict=tid`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_teams?on_conflict=tid`, {
             method: 'POST',
             headers: getHeaders({ 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
             body: JSON.stringify(chunk)
@@ -81,7 +100,7 @@ async function fetchTeamsByTids(tids) {
     const chunkSize = 150;
     for (let i = 0; i < unique.length; i += chunkSize) {
         const chunk = unique.slice(i, i + chunkSize);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?tid=in.(${chunk.join(',')})&select=*`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_teams?tid=in.(${chunk.join(',')})&select=*`, {
             headers: getHeaders()
         });
         if (!res.ok) {
@@ -99,7 +118,7 @@ async function fetchAllTeamsBasic() {
     const pageSize = 1000;
     let offset = 0;
     while (true) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country,senior_elo,u23_elo,u21_elo,u18_elo,senior_matches,last_scanned_at&order=tid.asc&limit=${pageSize}&offset=${offset}`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country,senior_elo,u23_elo,u21_elo,u18_elo,senior_matches,last_scanned_at&order=tid.asc&limit=${pageSize}&offset=${offset}`, {
             headers: getHeaders()
         });
         if (!res.ok) {
@@ -168,7 +187,7 @@ async function fetchIndProcessedMids(mids) {
     const chunkSize = 200;
     for (let i = 0; i < unique.length; i += chunkSize) {
         const chunk = unique.slice(i, i + chunkSize);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?mid=in.(${chunk.join(',')})&select=mid`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_ind_matches?mid=in.(${chunk.join(',')})&select=mid`, {
             headers: getHeaders()
         });
         if (!res.ok) {
@@ -183,10 +202,10 @@ async function fetchIndProcessedMids(mids) {
 async function insertIndMatches(rows) {
     assertEnv();
     if (!rows.length) return;
-    const chunkSize = 400;
+    const chunkSize = 300;
     for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?on_conflict=mid`, {
+        const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_ind_matches?on_conflict=mid`, {
             method: 'POST',
             headers: getHeaders({ 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
             body: JSON.stringify(chunk)
@@ -199,7 +218,7 @@ async function insertIndMatches(rows) {
 
 async function fetchMeta() {
     assertEnv();
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, {
+    const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, {
         headers: getHeaders()
     });
     if (!res.ok) {
@@ -220,7 +239,7 @@ async function upsertMeta(entries) {
         updated_at: nowIso
     }));
     if (!rows.length) return;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_meta?on_conflict=key`, {
+    const res = await fetchRetry(`${SUPABASE_URL}/rest/v1/mz_meta?on_conflict=key`, {
         method: 'POST',
         headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
         body: JSON.stringify(rows)

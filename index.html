@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MZ Pro-ELO Çift-Model Dünya Sıralaması & Karşılaştırma Laboratuvarı</title>
+    <title>MZ Pro-ELO Çift-Model Dünya Sıralaması & Anlık Hesaplama Laboratuvarı</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -20,7 +20,6 @@
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --gold: #f59e0b;
-            --warn: #fbbf24;
             --neg: #f87171;
             --pos: #4ade80;
         }
@@ -94,6 +93,54 @@
             line-height: 1.5;
         }
 
+        /* Anlık Hesaplama Sonuç Kartı */
+        .live-card {
+            display: none;
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.38), rgba(6, 78, 59, 0.28));
+            border: 1px solid rgba(96, 165, 250, 0.45);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 18px;
+        }
+
+        .live-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .live-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 10px;
+        }
+
+        .live-cat-box {
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 12px;
+        }
+
+        .live-cat-title {
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
+        .live-cat-nums {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-variant-numeric: tabular-nums;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -145,10 +192,11 @@
             margin-bottom: 16px;
         }
 
-        .tabs, .sort-tabs {
+        .tabs, .sort-tabs, .search-wrap {
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .tab-btn {
@@ -163,16 +211,8 @@
             transition: all 0.15s;
         }
 
-        .tab-btn:hover {
-            color: var(--text-main);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .tab-btn.active {
-            background: var(--primary);
-            color: #ffffff;
-            border-color: var(--primary-hover);
-        }
+        .tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
+        .tab-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary-hover); }
 
         .sort-btn {
             background: var(--bg-base);
@@ -186,26 +226,13 @@
             transition: all 0.15s;
         }
 
-        .sort-btn:hover {
-            color: #ffffff;
-            border-color: #64748b;
-        }
-
-        .sort-btn.active-hybrid {
-            background: rgba(59, 130, 246, 0.18);
-            border-color: rgba(59, 130, 246, 0.55);
-            color: #93c5fd;
-        }
-
-        .sort-btn.active-ind {
-            background: var(--ind-bg);
-            border-color: var(--ind-border);
-            color: #6ee7b7;
-        }
+        .sort-btn:hover { color: #ffffff; border-color: #64748b; }
+        .sort-btn.active-hybrid { background: rgba(59, 130, 246, 0.18); border-color: rgba(59, 130, 246, 0.55); color: #93c5fd; }
+        .sort-btn.active-ind { background: var(--ind-bg); border-color: var(--ind-border); color: #6ee7b7; }
 
         .search-box {
             position: relative;
-            min-width: 240px;
+            min-width: 220px;
         }
 
         .search-box input {
@@ -219,9 +246,7 @@
             outline: none;
         }
 
-        .search-box input:focus {
-            border-color: var(--primary);
-        }
+        .search-box input:focus { border-color: var(--primary); }
 
         .search-icon {
             position: absolute;
@@ -230,6 +255,36 @@
             transform: translateY(-50%);
             color: var(--text-muted);
         }
+
+        .live-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0f172a;
+            border: none;
+            padding: 8px 13px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: opacity 0.15s;
+        }
+
+        .live-btn:hover { opacity: 0.92; }
+        .live-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        .row-live-btn {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.38);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-right: 6px;
+        }
+
+        .row-live-btn:hover { background: rgba(245, 158, 11, 0.3); }
 
         .legend-bar {
             display: flex;
@@ -262,7 +317,7 @@
             border-collapse: collapse;
             text-align: left;
             font-size: 13px;
-            min-width: 780px;
+            min-width: 820px;
         }
 
         th {
@@ -303,23 +358,9 @@
         .rank-3 { background: rgba(180, 83, 9, 0.2); color: #f97316; border: 1px solid rgba(180, 83, 9, 0.4); }
         .rank-other { color: var(--text-muted); font-weight: 700; }
 
-        .team-link {
-            color: #ffffff;
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .team-link:hover {
-            color: var(--primary);
-            text-decoration: underline;
-        }
-
-        .team-tid {
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 600;
-            margin-top: 2px;
-        }
+        .team-link { color: #ffffff; text-decoration: none; font-weight: 700; }
+        .team-link:hover { color: var(--primary); text-decoration: underline; }
+        .team-tid { color: var(--text-muted); font-size: 11px; font-weight: 600; margin-top: 2px; }
 
         .elo-pill {
             display: inline-block;
@@ -345,28 +386,13 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .elo-snap {
-            color: var(--text-muted);
-            font-weight: 600;
-            font-size: 12.5px;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .diff-val {
-            font-weight: 800;
-            font-size: 12.5px;
-            font-variant-numeric: tabular-nums;
-        }
+        .elo-snap { color: var(--text-muted); font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+        .diff-val { font-weight: 800; font-size: 12.5px; font-variant-numeric: tabular-nums; }
         .diff-pos { color: var(--pos); }
         .diff-neg { color: var(--neg); }
         .diff-flat { color: var(--text-muted); }
 
-        .loading-state {
-            padding: 46px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 14px;
-        }
+        .loading-state { padding: 46px; text-align: center; color: var(--text-muted); font-size: 14px; }
 
         .pagination {
             display: flex;
@@ -400,9 +426,9 @@
             <div class="header-title">
                 <h1>
                     <span>⚽ MZ Pro-ELO Çift-Model Laboratuvarı</span>
-                    <span class="badge-live">Canlı Karşılaştırma</span>
+                    <span class="badge-live">100 Ülke • Anlık Motor</span>
                 </h1>
-                <p><strong>Hibrit (Stats + Fark)</strong> ile <strong>18.11.2026 Çapalı Bağımsız Model</strong> yan yana canlı takip edilir.</p>
+                <p><strong>Hibrit (Stats + Fark)</strong> ve <strong>18.11.2026 Bağımsız Model</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
             </div>
             <a href="https://github.com/nicotin66/mz-pro-elo-backend" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 12px; font-weight: 600;">
                 GitHub Deposu ↗
@@ -410,17 +436,18 @@
         </div>
 
         <div id="noticeBanner" class="notice-banner"></div>
+        <div id="liveResultCard" class="live-card"></div>
 
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Hesaplanmış / Kayıtlı Takım</div>
+                <div class="stat-label">Hesaplanmış / Aktif Havuz</div>
                 <div class="stat-value" id="stat-teams">...</div>
-                <div class="stat-desc" id="stat-teams-desc">Baştan sona hesaplanan / Keşfedilen toplam kulüp</div>
+                <div class="stat-desc" id="stat-teams-desc">100 ülke aktif kulüp havuzu (botlar hariç)</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Bağımsız İşlenen Maç</div>
                 <div class="stat-value" id="stat-matches" style="color: #34d399;">...</div>
-                <div class="stat-desc" id="stat-matches-desc">Çapa anından sonra tekil işlenen maçlar</div>
+                <div class="stat-desc">18.11 çapasından sonra tekil işlenen maçlar</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label" id="stat-top-label">Dünya #1 Senior</div>
@@ -445,12 +472,15 @@
                 <button class="sort-btn active-hybrid" id="sortHybridBtn">⚡ Hibrit Sırala</button>
                 <button class="sort-btn" id="sortIndBtn">🧭 Bağımsız Sırala</button>
             </div>
-            <div class="search-box">
-                <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="searchInput" placeholder="Takım adı veya ID ara...">
+            <div class="search-wrap">
+                <div class="search-box">
+                    <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Takım adı veya ID ara...">
+                </div>
+                <button class="live-btn" id="liveCalcBtn" title="Kutuya Takım ID yazıp anlık hesaplayın">⚡ Canlı Hesapla</button>
             </div>
         </div>
 
@@ -466,11 +496,11 @@
                     <tr>
                         <th style="width: 64px;">Sıra</th>
                         <th>Takım Bilgisi</th>
-                        <th style="width: 115px; text-align: right;">Çapa (18.11)</th>
-                        <th style="width: 135px; text-align: right;">Hibrit Pro-ELO</th>
-                        <th style="width: 145px; text-align: right;">Bağımsız Pro-ELO</th>
-                        <th style="width: 110px; text-align: right;">Fark (Bağ−Hib)</th>
-                        <th style="width: 70px; text-align: center;">Profil</th>
+                        <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
+                        <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
+                        <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
+                        <th style="width: 105px; text-align: right;">Fark (Bağ−Hib)</th>
+                        <th style="width: 105px; text-align: center;">İşlem</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -493,8 +523,8 @@
         const ANON_KEY = 'sb_publishable_STh8YlqTIwHyCCNP9YFp_Q_YF3TpRKC';
         const HEADERS = { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` };
 
-        let currentAge = 'senior';   // senior | u23 | u21 | u18
-        let sortMode = 'hybrid';     // hybrid | ind
+        let currentAge = 'senior';
+        let sortMode = 'hybrid';
         let currentPage = 1;
         const PAGE_SIZE = 50;
         let searchQuery = '';
@@ -524,10 +554,78 @@
             return total ? parseInt(total, 10) : 0;
         }
 
+        async function runLiveLookup(tid) {
+            const card = document.getElementById('liveResultCard');
+            const btn = document.getElementById('liveCalcBtn');
+            const cleanTid = String(tid || '').trim();
+            if (!/^\d+$/.test(cleanTid)) {
+                card.style.display = 'block';
+                card.innerHTML = `<div style="color:#fde68a;font-size:13px;">⚠️ Anlık hesaplama için arama kutusuna <strong>sayısal Takım ID</strong> girin (ör. <code>864852</code>) veya tablodaki herhangi bir satırın <strong>⚡</strong> butonuna basın.</div>`;
+                return;
+            }
+
+            btn.disabled = true;
+            card.style.display = 'block';
+            card.innerHTML = `<div style="color:#93c5fd;font-size:13px;">⏳ <strong>Takım #${cleanTid}</strong> için ManagerZone maç geçmişi ve canlı Statsxente verileri anlık hesaplanıyor (~2 sn)...</div>`;
+
+            try {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/live-elo?tid=${cleanTid}`, {
+                    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const hint = res.status === 404 && !data.error
+                        ? 'Supabase panelinde <code>live-elo</code> Edge Function henüz yayınlanmamış.'
+                        : (data.error || `HTTP ${res.status}`);
+                    card.innerHTML = `<div style="color:#fca5a5;font-size:13px;">❌ Canlı hesaplama yapılamadı: ${hint}</div>`;
+                    return;
+                }
+
+                const cats = [
+                    { key: 'senior', label: '🏆 Senior (A Takım)' },
+                    { key: 'u23', label: '🥉 U23' },
+                    { key: 'u21', label: '🥈 U21' },
+                    { key: 'u18', label: '🥇 U18' }
+                ];
+                const boxesHtml = cats.map(c => {
+                    const st = fmtNum(data.stats?.[c.key]);
+                    const hy = fmtNum(data.hybrid?.[c.key]);
+                    const df = data.diffs?.[c.key] || 0;
+                    const dfStr = df > 0 ? `+${df.toFixed(1)}` : df.toFixed(1);
+                    const ind = fmtNum(data.independent?.[c.key]);
+                    return `
+                        <div class="live-cat-box">
+                            <div class="live-cat-title">${c.label}</div>
+                            <div class="live-cat-nums"><span>Statsxente:</span><strong>${st}</strong></div>
+                            <div class="live-cat-nums"><span>Hibrit Pro-ELO:</span><strong style="color:#60a5fa;">${hy} (${dfStr})</strong></div>
+                            <div class="live-cat-nums"><span>Bağımsız (18.11):</span><strong style="color:#34d399;">${ind}</strong></div>
+                        </div>
+                    `;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="live-card-head">
+                        <div>
+                            <strong style="font-size:16px;color:#fff;">⚡ ${data.name}</strong>
+                            <span style="color:#94a3b8;font-size:12px;margin-left:8px;">ID: ${data.tid}${data.country ? ' • ' + data.country : ''} • ${data.totalMatchesScanned} maç tarandı • Veritabanına kaydedildi</span>
+                        </div>
+                        <button onclick="document.getElementById('liveResultCard').style.display='none'" style="background:transparent;border:1px solid #475569;color:#cbd5e1;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;">Kapat</button>
+                    </div>
+                    <div class="live-card-grid">${boxesHtml}</div>
+                `;
+                // Güncel veriyi tabloda da hemen yansıt
+                loadRankings();
+            } catch (err) {
+                card.innerHTML = `<div style="color:#fca5a5;font-size:13px;">❌ Bağlantı hatası: ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         async function fetchStatsAndMeta() {
             try {
-                const [totalTeams, scannedTeams, indMatches, metaRes] = await Promise.all([
-                    fetchCount('mz_teams?select=tid&limit=1'),
+                const [activeTeams, scannedTeams, indMatches, metaRes] = await Promise.all([
+                    fetchCount('mz_teams?select=tid&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null,senior_elo.not.is.null)&limit=1'),
                     fetchCount('mz_teams?select=tid&last_scanned_at=not.is.null&limit=1'),
                     fetchCount('mz_ind_matches?select=mid&limit=1'),
                     fetch(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, { headers: HEADERS })
@@ -535,9 +633,9 @@
                         .catch(() => null)
                 ]);
 
-                if (totalTeams !== null) {
+                if (activeTeams !== null) {
                     const scannedStr = scannedTeams !== null ? scannedTeams.toLocaleString('tr-TR') : '?';
-                    document.getElementById('stat-teams').textContent = `${scannedStr} / ${totalTeams.toLocaleString('tr-TR')}`;
+                    document.getElementById('stat-teams').textContent = `${scannedStr} / ${activeTeams.toLocaleString('tr-TR')}`;
                 }
 
                 if (indMatches !== null) {
@@ -545,9 +643,6 @@
                 } else {
                     v2Ready = false;
                     document.getElementById('stat-matches').textContent = 'Kurulmadı';
-                    const b = document.getElementById('noticeBanner');
-                    b.style.display = 'block';
-                    b.innerHTML = '⚠️ <strong>Çift Model (v2) sütunları henüz veritabanında açılmamış.</strong> Supabase SQL Editor içinde <code>migration_v2.sql</code> dosyasını çalıştırıp ardından tek seferlik <strong>snapshot</strong> taramasını başlattığınızda <em>Çapa (18.11)</em> ve <em>Bağımsız Pro-ELO</em> sütunları otomatik dolacaktır.';
                 }
 
                 if (Array.isArray(metaRes)) {
@@ -564,12 +659,7 @@
                             } catch (_) {}
                         }
                         document.getElementById('stat-snapshot-info').textContent = `Çapa: ${snapTr}${extra}`;
-                    } else {
-                        document.getElementById('stat-snapshot-info').textContent = 'Henüz anlık kayıt (snapshot) alınmadı';
                     }
-                } else {
-                    document.getElementById('stat-last-run').textContent = 'v2 bekleniyor';
-                    document.getElementById('stat-snapshot-info').textContent = 'migration_v2.sql sonrası aktif olur';
                 }
             } catch (e) {
                 console.error(e);
@@ -592,9 +682,10 @@
             const offset = (currentPage - 1) * PAGE_SIZE;
             let url = `${SUPABASE_URL}/rest/v1/mz_teams?select=${selectCols}&order=${orderCol}.desc.nullslast&limit=${PAGE_SIZE}&offset=${offset}`;
 
-            if (searchQuery.trim()) {
-                const q = encodeURIComponent(searchQuery.trim());
-                if (/^\d+$/.test(searchQuery.trim())) {
+            const trimmed = searchQuery.trim();
+            if (trimmed) {
+                const q = encodeURIComponent(trimmed);
+                if (/^\d+$/.test(trimmed)) {
                     url += `&tid=eq.${q}`;
                 } else {
                     url += `&name=ilike.*${q}*`;
@@ -602,20 +693,23 @@
             }
 
             try {
-                let res = await fetch(url, { headers: HEADERS });
-                // Eğer v2 sütunları henüz eklenmemişse otomatik v1 sorgusuna düş
-                if (!res.ok && v2Ready) {
-                    v2Ready = false;
-                    return loadRankings();
-                }
+                const res = await fetch(url, { headers: HEADERS });
+                if (!res.ok && v2Ready) { v2Ready = false; return loadRankings(); }
                 const teams = await res.json();
 
                 if (!Array.isArray(teams) || !teams.length) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Kayıt bulunamadı.</td></tr>';
+                    if (/^\d+$/.test(trimmed)) {
+                        tbody.innerHTML = `<tr><td colspan="7" class="loading-state">
+                            Takım <strong>#${trimmed}</strong> henüz havuzda yok.<br><br>
+                            <button class="live-btn" onclick="runLiveLookup('${trimmed}')">⚡ Takım #${trimmed} İçin Şimdi Canlı Hesapla (~2 sn)</button>
+                        </td></tr>`;
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Kayıt bulunamadı.</td></tr>';
+                    }
                     return;
                 }
 
-                if (currentPage === 1 && !searchQuery) {
+                if (currentPage === 1 && !trimmed) {
                     const ageLabel = currentAge.toUpperCase();
                     const modeLabel = (v2Ready && sortMode === 'ind') ? 'Bağımsız' : 'Hibrit';
                     document.getElementById('stat-top-label').textContent = `Dünya #1 ${ageLabel} (${modeLabel})`;
@@ -659,7 +753,8 @@
                         <td style="text-align: right;"><span class="elo-pill">${fmtNum(hybVal)}</span></td>
                         <td style="text-align: right;"><span class="elo-ind">${fmtNum(indVal)}</span></td>
                         <td style="text-align: right;">${diffHtml}</td>
-                        <td style="text-align: center;">
+                        <td style="text-align: center; white-space: nowrap;">
+                            <button class="row-live-btn" title="Bu takımı şimdi canlı hesapla" onclick="runLiveLookup('${t.tid}')">⚡</button>
                             <a href="${mzLink}" target="_blank" style="color: #94a3b8; font-size: 16px; text-decoration: none;">↗</a>
                         </td>
                     `;
@@ -699,6 +794,10 @@
             document.getElementById('sortHybridBtn').classList.remove('active-hybrid');
             currentPage = 1;
             loadRankings();
+        });
+
+        document.getElementById('liveCalcBtn').addEventListener('click', () => {
+            runLiveLookup(document.getElementById('searchInput').value);
         });
 
         let debounceTimer;
