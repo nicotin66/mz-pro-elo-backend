@@ -825,25 +825,66 @@
             loadRankings();
         });
 
+        async function doSearch(query) {
+            const trimmed = String(query || '').trim();
+            if (!trimmed) {
+                searchQuery = '';
+                currentPage = 1;
+                document.getElementById('liveResultCard').style.display = 'none';
+                loadRankings();
+                return;
+            }
+
+            // Sayısal Takım ID girilmişse doğrudan canlı hesapla ve göster
+            if (/^\d+$/.test(trimmed)) {
+                runLiveLookup(trimmed);
+                return;
+            }
+
+            // Metin girilmişse: Önce veritabanında kulüp adı olarak var mı kontrol et
+            const q = encodeURIComponent(trimmed);
+            const hybCol = `${currentAge}_elo`;
+            const indCol = `ind_${currentAge}_elo`;
+            const snapCol = `snap_${currentAge}`;
+            const selectCols = `tid,name,country,${hybCol},${indCol},${snapCol},ind_matches`;
+
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?select=${selectCols}&name=ilike.*${q}*&limit=10`, { headers: HEADERS });
+                const teams = res.ok ? await res.json() : [];
+
+                if (Array.isArray(teams) && teams.length > 0) {
+                    searchQuery = trimmed;
+                    currentPage = 1;
+                    loadRankings();
+                    return;
+                }
+            } catch (_) {}
+
+            // Kulüp adı olarak bulunamadıysa (örneğin menajer adı "alex66" gibi):
+            // Otomatik olarak canlı menajer aramasını çalıştır
+            runLiveLookup(trimmed);
+        }
+
         document.getElementById('liveCalcBtn').addEventListener('click', () => {
-            runLiveLookup(document.getElementById('searchInput').value);
+            doSearch(document.getElementById('searchInput').value);
         });
 
         document.getElementById('searchInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                runLiveLookup(document.getElementById('searchInput').value);
+                doSearch(document.getElementById('searchInput').value);
             }
         });
 
-        let debounceTimer;
+        // Yazarken harf harf arama yapıp alakasız kulüpleri dökmesin;
+        // Sadece kutu temizlenirse genel listeye geri dönsün
         document.getElementById('searchInput').addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                searchQuery = e.target.value;
+            if (!e.target.value.trim()) {
+                searchQuery = '';
                 currentPage = 1;
+                document.getElementById('liveResultCard').style.display = 'none';
                 loadRankings();
-            }, 300);
+            }
         });
 
         document.getElementById('prevBtn').addEventListener('click', () => {
