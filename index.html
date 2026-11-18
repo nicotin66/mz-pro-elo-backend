@@ -345,12 +345,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 28px;
-            height: 26px;
-            padding: 0 6px;
+            gap: 4px;
+            white-space: nowrap;
+            min-width: 34px;
+            height: 28px;
+            padding: 0 9px;
             border-radius: 6px;
             font-weight: 800;
-            font-size: 12px;
+            font-size: 12.5px;
+            font-variant-numeric: tabular-nums;
         }
 
         .rank-1 { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
@@ -494,7 +497,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 64px;">Sıra</th>
+                        <th style="width: 84px;">Sıra</th>
                         <th>Takım Bilgisi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
                         <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
@@ -718,13 +721,25 @@
                         `Hibrit: ${fmtNum(teams[0][hybCol])} • Bağımsız: ${fmtNum(teams[0][indCol])}`;
                 }
 
+                // Arama yapıldığında her takımın gerçek dünya sırasını veritabanından hesapla
+                let realRanks = null;
+                if (trimmed) {
+                    realRanks = await Promise.all(teams.map(async (t) => {
+                        const v = t[orderCol];
+                        if (v === null || v === undefined) return null;
+                        const higher = await fetchCount(`mz_teams?select=tid&${orderCol}=gt.${encodeURIComponent(v)}&limit=1`);
+                        return higher !== null ? (higher + 1) : null;
+                    }));
+                }
+
                 tbody.innerHTML = '';
                 teams.forEach((t, i) => {
-                    const globalRank = offset + i + 1;
-                    let rankBadge = `<span class="rank-badge rank-other">${globalRank}</span>`;
-                    if (globalRank === 1) rankBadge = `<span class="rank-badge rank-1">🥇 1</span>`;
-                    else if (globalRank === 2) rankBadge = `<span class="rank-badge rank-2">🥈 2</span>`;
-                    else if (globalRank === 3) rankBadge = `<span class="rank-badge rank-3">🥉 3</span>`;
+                    const globalRank = trimmed ? realRanks[i] : (offset + i + 1);
+                    let rankBadge = '<span class="rank-badge rank-other">—</span>';
+                    if (globalRank === 1) rankBadge = `<span class="rank-badge rank-1">1 🥇</span>`;
+                    else if (globalRank === 2) rankBadge = `<span class="rank-badge rank-2">2 🥈</span>`;
+                    else if (globalRank === 3) rankBadge = `<span class="rank-badge rank-3">3 🥉</span>`;
+                    else if (globalRank !== null) rankBadge = `<span class="rank-badge rank-other">${globalRank.toLocaleString('tr-TR')}</span>`;
 
                     const hybVal = t[hybCol] != null ? Number(t[hybCol]) : null;
                     const indVal = t[indCol] != null ? Number(t[indCol]) : null;
