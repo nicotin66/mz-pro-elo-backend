@@ -195,30 +195,7 @@ function computeHybrid(statsElo: EloSet, matches: ParsedMatch[], oppElos: Record
   function evalCat(cat: 'senior' | 'u23' | 'u21' | 'u18', baseElo: number | null) {
     const ms = catMatches[cat];
     if (!baseElo || baseElo <= 0) {
-      if (!ms.length) return { proElo: null, diff: 0, matchCount: 0 };
-      const ranked = ms
-        .map(m => oppElos[m.oppTid]?.[cat] ?? null)
-        .filter((v): v is number => v !== null);
-      let simElo = ranked.length
-        ? ranked.reduce((a, b) => a + b, 0) / ranked.length
-        : (cat === 'senior' ? 1400 : 1000);
-      const chrono = [...ms].sort((a, b) => a.date.localeCompare(b.date));
-      for (const m of chrono) {
-        const kPro = getKPro(m.type, m.typeName.toLowerCase(), m.typeName);
-        if (kPro === null) continue;
-        const rawOpp = oppElos[m.oppTid]?.[cat] ?? null;
-        const oppElo = rawOpp !== null ? rawOpp : simElo;
-        const expected = getExpectedScore(simElo, oppElo);
-        const gDiff = m.myGoals - m.oppGoals;
-        const actual = gDiff > 0 ? 1 : (gDiff < 0 ? 0 : 0.5);
-        const isPriv = m.type.includes('private_cup') || m.type.includes('friendly');
-        const gMult = (isPriv || rawOpp === null) ? 1.0 : getGoalDiffMultiplier(gDiff, simElo - oppElo);
-        let proDelta = kPro * gMult * (actual - expected);
-        const isPlayoff = m.type.includes('cup_playoff') || m.type.includes('playoff') || m.type.includes('private_cup_playoff');
-        if (isPlayoff && actual < 0.5) proDelta = 0;
-        simElo = Math.max(100, simElo + proDelta);
-      }
-      return { proElo: Math.round(simElo * 10) / 10, diff: 0, matchCount: ms.length };
+      return { proElo: null, diff: 0, matchCount: ms.length };
     }
 
     let netDiff = 0;

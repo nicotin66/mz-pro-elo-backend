@@ -130,7 +130,7 @@ async function pickQueue(hasIndColumns) {
 
     // 3) Aktif takımlardan en uzun süredir taranmamış olanlar (bot/ölü kulüpler hariç!)
     const activeFilter = hasIndColumns
-        ? '&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null,senior_elo.not.is.null)'
+        ? '&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null)'
         : '&senior_elo=not.is.null';
     const targetTotal = map.size + ROTATE_LIMIT;
     const rot = await fetchPaged(

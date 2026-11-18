@@ -627,9 +627,10 @@
 
         async function fetchStatsAndMeta() {
             try {
+                const activeFilter = 'or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null)';
                 const [activeTeams, scannedTeams, indMatches, metaRes] = await Promise.all([
-                    fetchCount('mz_teams?select=tid&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null,senior_elo.not.is.null)&limit=1'),
-                    fetchCount('mz_teams?select=tid&last_scanned_at=not.is.null&limit=1'),
+                    fetchCount(`mz_teams?select=tid&${activeFilter}&limit=1`),
+                    fetchCount(`mz_teams?select=tid&${activeFilter}&last_scanned_at=not.is.null&limit=1`),
                     fetchCount('mz_ind_matches?select=mid&limit=1'),
                     fetch(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, { headers: HEADERS })
                         .then(r => r.ok ? r.json() : null)

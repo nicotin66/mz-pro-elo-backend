@@ -132,37 +132,9 @@ function computeProElo(statsElo, matches, oppElos = {}) {
         const ms = catMatches[cat] || [];
         const isUnrankedSelf = (!baseElo || baseElo <= 0);
 
-        if (isUnrankedSelf && ms.length === 0) {
-            return { proElo: null, adjustment: 0, matchCount: 0, standalone: false };
-        }
-
+        // Statsxente'de o kategoride kaydı olmayan alt lig/bot kulüplere uydurma 1400 puan üretilmez
         if (isUnrankedSelf) {
-            const rankedOppElos = ms
-                .map(m => (oppElos[m.oppTid] && oppElos[m.oppTid][cat] != null) ? oppElos[m.oppTid][cat] : null)
-                .filter(v => v !== null);
-            let simElo = rankedOppElos.length > 0
-                ? (rankedOppElos.reduce((a, b) => a + b, 0) / rankedOppElos.length)
-                : (cat === 'senior' ? (defaultLeagueMult >= 1.15 ? 1650 : (defaultLeagueMult >= 0.65 ? 1400 : 1100)) : 1000);
-
-            const chronoMs = [...ms].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-            chronoMs.forEach(m => {
-                const mType = (m.type || '').toLowerCase();
-                const mTypeName = (m.typeName || '').toLowerCase();
-                const kPro = getKPro(mType, mTypeName, m.typeName, defaultLeagueMult);
-                if (kPro === null) return;
-                const rawOppElo = (oppElos[m.oppTid] && oppElos[m.oppTid][cat] != null) ? oppElos[m.oppTid][cat] : null;
-                const oppElo = rawOppElo !== null ? rawOppElo : simElo;
-                const expected = ProEloEngine.getExpectedScore(simElo, oppElo);
-                const gDiff = m.myGoals - m.oppGoals;
-                const actual = gDiff > 0 ? 1 : (gDiff < 0 ? 0 : 0.5);
-                const isPrivateComp = mType.includes('private_cup') || mType.includes('friendly');
-                const gMult = (isPrivateComp || rawOppElo === null) ? 1.0 : ProEloEngine.getGoalDiffMultiplier(gDiff, simElo - oppElo);
-                let proDelta = kPro * gMult * (actual - expected);
-                const isPlayoff = mType.includes('cup_playoff') || mType.includes('playoff') || mType.includes('private_cup_playoff');
-                if (isPlayoff && actual < 0.5) proDelta = 0;
-                simElo = Math.max(100, simElo + proDelta);
-            });
-            return { proElo: Math.round(simElo * 10) / 10, adjustment: 0, matchCount: ms.length, standalone: true };
+            return { proElo: null, adjustment: 0, matchCount: ms.length, standalone: false };
         }
 
         let officialNetDiff = 0;
