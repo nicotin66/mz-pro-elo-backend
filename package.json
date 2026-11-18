@@ -1,14 +1,15 @@
 ﻿{
   "name": "mz-pro-elo-backend",
-  "version": "1.0.0",
-  "description": "ManagerZone Independent Pro-ELO Crawler & Supabase Updater",
+  "version": "2.0.0",
+  "description": "ManagerZone Dual-Model Pro-ELO (Hybrid + Independent) Crawler & Supabase Updater",
   "private": true,
   "scripts": {
     "seed": "node src/seedFromStats.js",
-    "crawl": "node src/crawler.js",`n    "refresh": "node src/refresh.js"
+    "snapshot": "node src/snapshotAll.js",
+    "refresh": "node src/refresh.js",
+    "crawl": "node src/crawler.js"
   },
   "engines": {
     "node": ">=20.0.0"
   }
 }
-

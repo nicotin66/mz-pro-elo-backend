@@ -129,9 +129,9 @@ function parseMatchlistXml(xmlText) {
         while ((tm = teamRegex.exec(body)) !== null) {
             const tAttrs = tm[1];
             teams.push({
-                tid: parseInt(getAttr(tAttrs, 'id'), 10),
-                name: getAttr(tAttrs, 'name'),
-                country: getAttr(tAttrs, 'country'),
+                tid: parseInt(getAttr(tAttrs, 'teamId') || getAttr(tAttrs, 'id'), 10),
+                name: getAttr(tAttrs, 'teamName') || getAttr(tAttrs, 'name'),
+                country: (getAttr(tAttrs, 'countryShortname') || getAttr(tAttrs, 'country') || '').toUpperCase(),
                 field: getAttr(tAttrs, 'field'),
                 goals: parseInt(getAttr(tAttrs, 'goals') || '0', 10)
             });

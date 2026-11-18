@@ -93,6 +93,26 @@ async function fetchTeamsByTids(tids) {
     return map;
 }
 
+async function fetchAllTeamsBasic() {
+    assertEnv();
+    const all = [];
+    const pageSize = 1000;
+    let offset = 0;
+    while (true) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?select=tid,name,country,senior_elo,u23_elo,u21_elo,u18_elo,senior_matches,last_scanned_at&order=tid.asc&limit=${pageSize}&offset=${offset}`, {
+            headers: getHeaders()
+        });
+        if (!res.ok) {
+            throw new Error(`fetchAllTeamsBasic hatası (${res.status}): ${await res.text()}`);
+        }
+        const rows = await res.json();
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+        offset += pageSize;
+    }
+    return all;
+}
+
 async function fetchNextTeamsToScan(limit = 300) {
     assertEnv();
     const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_teams?select=*&order=last_scanned_at.asc.nullsfirst&limit=${limit}`, {
@@ -140,6 +160,76 @@ async function insertProcessedMatches(rows) {
     }
 }
 
+// ---- Bağımsız Model (v2) Yardımcıları ----
+async function fetchIndProcessedMids(mids) {
+    assertEnv();
+    const set = new Set();
+    const unique = Array.from(new Set(mids.map(Number).filter(Boolean)));
+    const chunkSize = 200;
+    for (let i = 0; i < unique.length; i += chunkSize) {
+        const chunk = unique.slice(i, i + chunkSize);
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?mid=in.(${chunk.join(',')})&select=mid`, {
+            headers: getHeaders()
+        });
+        if (!res.ok) {
+            throw new Error(`fetchIndProcessedMids hatası (${res.status}): ${await res.text()}`);
+        }
+        const data = await res.json();
+        data.forEach(r => set.add(Number(r.mid)));
+    }
+    return set;
+}
+
+async function insertIndMatches(rows) {
+    assertEnv();
+    if (!rows.length) return;
+    const chunkSize = 400;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?on_conflict=mid`, {
+            method: 'POST',
+            headers: getHeaders({ 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
+            body: JSON.stringify(chunk)
+        });
+        if (!res.ok) {
+            throw new Error(`insertIndMatches hatası (${res.status}): ${await res.text()}`);
+        }
+    }
+}
+
+async function fetchMeta() {
+    assertEnv();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, {
+        headers: getHeaders()
+    });
+    if (!res.ok) {
+        throw new Error(`fetchMeta hatası (${res.status}): ${await res.text()}`);
+    }
+    const rows = await res.json();
+    const obj = {};
+    rows.forEach(r => { obj[r.key] = r.value; });
+    return obj;
+}
+
+async function upsertMeta(entries) {
+    assertEnv();
+    const nowIso = new Date().toISOString();
+    const rows = Object.entries(entries).map(([key, value]) => ({
+        key,
+        value: String(value),
+        updated_at: nowIso
+    }));
+    if (!rows.length) return;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/mz_meta?on_conflict=key`, {
+        method: 'POST',
+        headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(rows)
+    });
+    if (!res.ok) {
+        throw new Error(`upsertMeta hatası (${res.status}): ${await res.text()}`);
+    }
+}
+
 async function cleanupOldMatches() {
     assertEnv();
     await fetch(`${SUPABASE_URL}/rest/v1/rpc/cleanup_old_mz_matches`, {
@@ -153,8 +243,13 @@ module.exports = {
     upsertTeams,
     insertMissingTeams,
     fetchTeamsByTids,
+    fetchAllTeamsBasic,
     fetchNextTeamsToScan,
     fetchProcessedMids,
     insertProcessedMatches,
+    fetchIndProcessedMids,
+    insertIndMatches,
+    fetchMeta,
+    upsertMeta,
     cleanupOldMatches
 };

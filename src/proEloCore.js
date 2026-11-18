@@ -1,11 +1,10 @@
 // =====================================================================
 // PRO-ELO ÇEKİRDEK HESAPLAMA (Tampermonkey betiğinin BİREBİR kopyası)
 // ---------------------------------------------------------------------
-// Bu dosyadaki formül, betikteki computeProEloAdvanced() fonksiyonuyla
-// satır satır aynıdır. Böylece site (Supabase) ile betik AYNI girdilerle
-// AYNI sonucu üretir:
-//   Pro-ELO = Canlı Statsxente ELO + Son maç listesindeki (Pro - Stats) farkı
-// Rakip ELO'ları da betikteki gibi SAF Statsxente değerleridir.
+// Hem Model 1 (Hibrit: Canlı Statsxente + 30 günlük Pro-Stats farkı)
+// hem Model 2 (Bağımsız: 18.11.2026 çapası + kronolojik tekil maçlar)
+// birebir aynı K faktörleri, gol farkı çarpanı, 300 ELO anti-farma ve
+// FIFA eleme 0-ceza kurallarını kullanır.
 // =====================================================================
 
 const ProEloEngine = {
@@ -44,6 +43,40 @@ function parseVal(v) {
     return (!isNaN(n) && n > 0) ? Math.round(n * 10) / 10 : null;
 }
 
+// ManagerZone XML maç tarihleri Europe/Stockholm (CET/CEST) saat dilimindedir
+function getMzNowString(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Stockholm',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(date);
+    const get = (t) => parts.find(p => p.type === t)?.value || '00';
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+function isExemptMatch(rawType) {
+    const t = (rawType || '').toLowerCase();
+    return t === 'friendly' || t.includes('scout') || t === 'special';
+}
+
+function classifyCategory(rawType, typeName) {
+    const tType = (rawType || '').toLowerCase();
+    const tName = (typeName || '').toLowerCase();
+    const normName = tName.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/\u1d1c/g, 'u');
+    const isCat = (age) => {
+        const re = new RegExp(`(?:^|[^a-z0-9])u-?${age}(?:$|[^a-z0-9])`);
+        return tType.includes(`u${age}`) || re.test(tType) || re.test(normName);
+    };
+    if (isCat('18')) return 'u18';
+    if (isCat('21')) return 'u21';
+    if (isCat('23')) return 'u23';
+    return 'senior';
+}
+
 // parseMatchlistXml çıktısını betikteki maç formatına çevirir
 function toScriptMatches(rawMatches, tid) {
     const t = Number(tid);
@@ -62,7 +95,7 @@ function toScriptMatches(rawMatches, tid) {
     });
 }
 
-function getKPro(mType, mTypeName, typeName, defaultLeagueMult) {
+function getKPro(mType, mTypeName, typeName, defaultLeagueMult = 0.80) {
     if (mType.includes('friendly')) return 10;
     if (mType.includes('private_cup')) return 10;
     if (mType.includes('cup_playoff') || mTypeName.includes('final') || mTypeName.includes('semi') || mTypeName.includes('quarter') || mTypeName.includes('playoff') || mTypeName.includes('1/')) {
@@ -81,27 +114,18 @@ function getKPro(mType, mTypeName, typeName, defaultLeagueMult) {
     return null; // ELO'ya dahil edilmez
 }
 
-// statsElo: {senior,u23,u21,u18} (parseVal uygulanmış), matches: toScriptMatches çıktısı,
-// oppElos: { [tidStr]: {senior,u23,u21,u18} }
+// =====================================================================
+// MODEL 1 (HİBRİT): Canlı Statsxente + 30 günlük maçlardan Pro-Stats farkı
+// =====================================================================
 function computeProElo(statsElo, matches, oppElos = {}) {
     const catMatches = { senior: [], u23: [], u21: [], u18: [] };
 
     matches.forEach(m => {
-        if (m.type === 'friendly' || m.type.includes('scout') || m.type === 'special') return;
-        const tName = m.typeName.toLowerCase();
-        const tType = m.type.toLowerCase();
-        const normName = tName.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/\u1d1c/g, 'u');
-        const isCat = (age) => {
-            const re = new RegExp(`(?:^|[^a-z0-9])u-?${age}(?:$|[^a-z0-9])`);
-            return tType.includes(`u${age}`) || re.test(tType) || re.test(normName);
-        };
-        if (isCat('18')) catMatches.u18.push(m);
-        else if (isCat('21')) catMatches.u21.push(m);
-        else if (isCat('23')) catMatches.u23.push(m);
-        else catMatches.senior.push(m);
+        if (isExemptMatch(m.type)) return;
+        const cat = classifyCategory(m.type, m.typeName);
+        catMatches[cat].push(m);
     });
 
-    // Sunucu tarafında takım sayfası DOM'u yok; betikte de lig bilgisi bulunamazsa 0.80 kullanılır
     const defaultLeagueMult = 0.80;
 
     function evalCategory(cat, baseElo) {
@@ -112,7 +136,6 @@ function computeProElo(statsElo, matches, oppElos = {}) {
             return { proElo: null, adjustment: 0, matchCount: 0, standalone: false };
         }
 
-        // Statsxente kaydı yok: kronolojik bağımsız simülasyon (betikle aynı)
         if (isUnrankedSelf) {
             const rankedOppElos = ms
                 .map(m => (oppElos[m.oppTid] && oppElos[m.oppTid][cat] != null) ? oppElos[m.oppTid][cat] : null)
@@ -185,4 +208,59 @@ function computeProElo(statsElo, matches, oppElos = {}) {
     };
 }
 
-module.exports = { ProEloEngine, parseVal, toScriptMatches, computeProElo };
+// =====================================================================
+// MODEL 2 (BAĞIMSIZ): Tek maç için Pro-ELO değişimi (18.11.2026+)
+// Model 1 ile birebir aynı K, G, 300-ELO anti-farma ve FIFA 0-ceza kuralı
+// =====================================================================
+function computeIndependentMatchDelta(homeElo, awayElo, homeGoals, awayGoals, rawType, typeName, oppMissing = false) {
+    const mType = (rawType || '').toLowerCase();
+    const mTypeName = (typeName || '').toLowerCase();
+    const age = classifyCategory(rawType, typeName);
+
+    if (isExemptMatch(mType)) {
+        return { age, k: 0, homeDelta: 0, awayDelta: 0 };
+    }
+
+    const kPro = getKPro(mType, mTypeName, typeName, 0.80);
+    if (kPro === null) {
+        return { age, k: 0, homeDelta: 0, awayDelta: 0 };
+    }
+
+    const isPrivateComp = mType.includes('private_cup') || mType.includes('friendly');
+    const gDiff = homeGoals - awayGoals;
+    const gMult = (isPrivateComp || oppMissing)
+        ? 1.0
+        : ProEloEngine.getGoalDiffMultiplier(gDiff, homeElo - awayElo);
+
+    const expHome = ProEloEngine.getExpectedScore(homeElo, awayElo);
+    const actualHome = gDiff > 0 ? 1 : (gDiff < 0 ? 0 : 0.5);
+
+    let homeDelta = kPro * gMult * (actualHome - expHome);
+    let awayDelta = -homeDelta;
+
+    // FIFA Eleme Koruması: Eleme maçında kaybedene 0 ceza
+    const isPlayoff = mType.includes('cup_playoff') || mType.includes('playoff') || mType.includes('private_cup_playoff');
+    if (isPlayoff) {
+        if (actualHome < 0.5 && homeDelta < 0) homeDelta = 0;
+        if (actualHome > 0.5 && awayDelta < 0) awayDelta = 0;
+    }
+
+    return {
+        age,
+        k: kPro,
+        homeDelta: Number(homeDelta.toFixed(2)),
+        awayDelta: Number(awayDelta.toFixed(2))
+    };
+}
+
+module.exports = {
+    ProEloEngine,
+    parseVal,
+    getMzNowString,
+    isExemptMatch,
+    classifyCategory,
+    toScriptMatches,
+    getKPro,
+    computeProElo,
+    computeIndependentMatchDelta
+};

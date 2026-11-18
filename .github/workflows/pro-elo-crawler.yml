@@ -2,27 +2,27 @@ name: MZ Pro-ELO Crawler
 
 on:
   schedule:
-    # GitHub, tam saat başı (:00) çalışan işleri yoğunluktan dolayı sık sık geciktirir/atlar.
-    # Bu yüzden saatte 2 kez, yoğun olmayan dakikalarda tetiklenir.
-    - cron: '7,37 * * * *'
+    # Yedek tetikleyici (asıl kesin saat başı tetikleme cron-job.org üzerinden workflow_dispatch ile yapılır)
+    - cron: '37 */2 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Çalışma modu (refresh = normal saatlik yenileme, seed = ilk kurulum)'
-        required: true
+        description: 'Çalışma modu (refresh = çift model yenileme, snapshot = tek seferlik anlık kayıt, seed = ilk kurulum)'
+        required: false
         default: 'refresh'
         type: choice
         options:
           - refresh
+          - snapshot
           - seed
       top_limit:
-        description: 'Her koşuda mutlaka yenilenecek en üst takım sayısı'
+        description: 'Her koşuda mutlaka yenilenecek en üst hibrit takım sayısı'
         required: false
         default: '300'
       rotate_limit:
-        description: 'Sırayla yenilenecek (en eski güncellenen) takım sayısı'
+        description: 'Sırayla yenilenecek takım sayısı'
         required: false
-        default: '900'
+        default: '750'
 
 concurrency:
   group: pro-elo-refresh
@@ -48,11 +48,18 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node src/seedFromStats.js
 
-      - name: Pro-ELO yenileme (betikle aynı formül)
-        if: ${{ github.event.inputs.mode != 'seed' }}
+      - name: Tek seferlik Statsxente anlık kaydı (snapshot)
+        if: ${{ github.event.inputs.mode == 'snapshot' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node src/snapshotAll.js
+
+      - name: Çift Model Pro-ELO yenileme (Hibrit + Bağımsız)
+        if: ${{ github.event.inputs.mode != 'seed' && github.event.inputs.mode != 'snapshot' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           TOP_LIMIT: ${{ github.event.inputs.top_limit || '300' }}
-          ROTATE_LIMIT: ${{ github.event.inputs.rotate_limit || '900' }}
+          ROTATE_LIMIT: ${{ github.event.inputs.rotate_limit || '750' }}
         run: node src/refresh.js
