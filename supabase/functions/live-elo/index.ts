@@ -236,12 +236,44 @@ Deno.serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
-    const tidStr = url.searchParams.get('tid') || '';
-    const tid = parseInt(tidStr, 10);
-    if (!tid || tid <= 0) {
-      return new Response(JSON.stringify({ error: 'Geçerli bir tid parametresi gerekli (?tid=864852)' }), {
-        status: 400, headers: CORS_HEADERS
-      });
+    const tidStr = (url.searchParams.get('tid') || '').trim();
+    const userParam = (url.searchParams.get('username') || url.searchParams.get('user') || '').trim();
+    let tid = parseInt(tidStr, 10);
+    let managerUsername = userParam;
+
+    // Eğer sayısal Takım ID girilmemişse, kullanıcı adından futbol takımı ID'sini tespit et
+    if (isNaN(tid) || tid <= 0) {
+      if (!userParam) {
+        return new Response(JSON.stringify({ error: 'Geçerli bir tid veya username parametresi gerekli (?tid=864852 veya ?username=alex66)' }), {
+          status: 400, headers: CORS_HEADERS
+        });
+      }
+
+      try {
+        const mzUserXml = await fetch(`https://www.managerzone.com/xml/manager_data.php?sport_id=1&username=${encodeURIComponent(userParam)}`)
+          .then(r => r.ok ? r.text() : '')
+          .catch(() => '');
+
+        if (!mzUserXml || mzUserXml.includes('Invalid parameters') || mzUserXml.includes('ManagerZone_Error')) {
+          return new Response(JSON.stringify({ error: `'${userParam}' isimli kullanıcı ManagerZone'da bulunamadı.` }), {
+            status: 404, headers: CORS_HEADERS
+          });
+        }
+
+        const teamMatch = mzUserXml.match(/<Team\s+[^>]*sport="soccer"[^>]*teamId="(\d+)"/i) || mzUserXml.match(/<Team\s+[^>]*teamId="(\d+)"/i);
+        if (!teamMatch) {
+          return new Response(JSON.stringify({ error: `'${userParam}' isimli menajerin aktif bir futbol takımı bulunamadı.` }), {
+            status: 404, headers: CORS_HEADERS
+          });
+        }
+        tid = parseInt(teamMatch[1], 10);
+        const userAttrMatch = mzUserXml.match(/<UserData\s+[^>]*username="([^"]+)"/i);
+        if (userAttrMatch) managerUsername = userAttrMatch[1];
+      } catch (err) {
+        return new Response(JSON.stringify({ error: `Kullanıcı sorgulanırken hata: ${String(err)}` }), {
+          status: 500, headers: CORS_HEADERS
+        });
+      }
     }
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
@@ -320,6 +352,7 @@ Deno.serve(async (req: Request) => {
       tid,
       name: row.name,
       country: row.country,
+      user: managerUsername || null,
       stats: selfStats,
       hybrid: {
         senior: res.senior.proElo,

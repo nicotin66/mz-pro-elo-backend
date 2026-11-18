@@ -481,7 +481,7 @@
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="searchInput" placeholder="Takım adı veya ID ara...">
+                    <input type="text" id="searchInput" placeholder="Takım adı, kullanıcı adı veya ID ara...">
                 </div>
                 <button class="live-btn" id="liveCalcBtn" title="Kutuya Takım ID yazıp anlık hesaplayın">⚡ Canlı Hesapla</button>
             </div>
@@ -557,22 +557,26 @@
             return total ? parseInt(total, 10) : 0;
         }
 
-        async function runLiveLookup(tid) {
+        async function runLiveLookup(query) {
             const card = document.getElementById('liveResultCard');
             const btn = document.getElementById('liveCalcBtn');
-            const cleanTid = String(tid || '').trim();
-            if (!/^\d+$/.test(cleanTid)) {
+            const cleanQuery = String(query || '').trim();
+            if (!cleanQuery) {
                 card.style.display = 'block';
-                card.innerHTML = `<div style="color:#fde68a;font-size:13px;">⚠️ Anlık hesaplama için arama kutusuna <strong>sayısal Takım ID</strong> girin (ör. <code>864852</code>) veya tablodaki herhangi bir satırın <strong>⚡</strong> butonuna basın.</div>`;
+                card.innerHTML = `<div style="color:#fde68a;font-size:13px;">⚠️ Arama kutusuna bir <strong>Takım ID</strong>, <strong>Takım Adı</strong> veya <strong>Kullanıcı Adı</strong> girin (ör. <code>829978</code> veya <code>alex66</code>).</div>`;
                 return;
             }
 
             btn.disabled = true;
             card.style.display = 'block';
-            card.innerHTML = `<div style="color:#93c5fd;font-size:13px;">⏳ <strong>Takım #${cleanTid}</strong> için ManagerZone maç geçmişi ve canlı Statsxente verileri anlık hesaplanıyor (~2 sn)...</div>`;
+            const isTid = /^\d+$/.test(cleanQuery);
+            const lookupParam = isTid ? `tid=${cleanQuery}` : `username=${encodeURIComponent(cleanQuery)}`;
+            const labelStr = isTid ? `Takım #${cleanQuery}` : `Kullanıcı: <strong>${cleanQuery}</strong>`;
+
+            card.innerHTML = `<div style="color:#93c5fd;font-size:13px;">⏳ ${labelStr} için ManagerZone verileri ve canlı Pro-ELO hesaplanıyor (~2 sn)...</div>`;
 
             try {
-                const res = await fetch(`${SUPABASE_URL}/functions/v1/live-elo?tid=${cleanTid}`, {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/live-elo?${lookupParam}`, {
                     headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
                 });
                 const data = await res.json().catch(() => ({}));
@@ -606,17 +610,22 @@
                     `;
                 }).join('');
 
+                const userBadge = data.user ? `<span style="color:#6ee7b7;font-weight:600;margin-right:6px;">👤 Menajer: ${data.user}</span> • ` : '';
+
                 card.innerHTML = `
                     <div class="live-card-head">
                         <div>
                             <strong style="font-size:16px;color:#fff;">⚡ ${data.name}</strong>
-                            <span style="color:#94a3b8;font-size:12px;margin-left:8px;">ID: ${data.tid}${data.country ? ' • ' + data.country : ''} • ${data.totalMatchesScanned} maç tarandı • Veritabanına kaydedildi</span>
+                            <span style="color:#94a3b8;font-size:12px;margin-left:8px;">${userBadge}ID: ${data.tid}${data.country ? ' • ' + data.country : ''} • ${data.totalMatchesScanned} maç tarandı • Veritabanına kaydedildi</span>
                         </div>
                         <button onclick="document.getElementById('liveResultCard').style.display='none'" style="background:transparent;border:1px solid #475569;color:#cbd5e1;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;">Kapat</button>
                     </div>
                     <div class="live-card-grid">${boxesHtml}</div>
                 `;
-                // Güncel veriyi tabloda da hemen yansıt
+                // Bu takımı arama kutusuna yazıp tabloda listele
+                searchQuery = String(data.tid);
+                document.getElementById('searchInput').value = searchQuery;
+                currentPage = 1;
                 loadRankings();
             } catch (err) {
                 card.innerHTML = `<div style="color:#fca5a5;font-size:13px;">❌ Bağlantı hatası: ${err.message}</div>`;
@@ -708,7 +717,11 @@
                             <button class="live-btn" onclick="runLiveLookup('${trimmed}')">⚡ Takım #${trimmed} İçin Şimdi Canlı Hesapla (~2 sn)</button>
                         </td></tr>`;
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Kayıt bulunamadı.</td></tr>';
+                        tbody.innerHTML = `<tr><td colspan="7" class="loading-state">
+                            <strong>"${trimmed}"</strong> isimli kulüp havuzda bulunamadı.<br><br>
+                            <span style="color:#94a3b8;font-size:12.5px;">Eğer bu bir <strong>kullanıcı adı (menajer)</strong> ise ManagerZone'dan canlı aratabilirsiniz:</span><br><br>
+                            <button class="live-btn" onclick="runLiveLookup('${trimmed}')">⚡ "${trimmed}" Kullanıcısını Canlı Bul & Hesapla (~2 sn)</button>
+                        </td></tr>`;
                     }
                     return;
                 }
@@ -814,6 +827,13 @@
 
         document.getElementById('liveCalcBtn').addEventListener('click', () => {
             runLiveLookup(document.getElementById('searchInput').value);
+        });
+
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runLiveLookup(document.getElementById('searchInput').value);
+            }
         });
 
         let debounceTimer;
