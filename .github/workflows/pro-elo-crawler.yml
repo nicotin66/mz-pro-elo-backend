@@ -2,47 +2,57 @@ name: MZ Pro-ELO Crawler
 
 on:
   schedule:
-    # Her saat başı otomatik çalışır
-    - cron: '0 * * * *'
+    # GitHub, tam saat başı (:00) çalışan işleri yoğunluktan dolayı sık sık geciktirir/atlar.
+    # Bu yüzden saatte 2 kez, yoğun olmayan dakikalarda tetiklenir.
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Çalışma modu (seed = ilk kurulum, crawl = normal tarama)'
+        description: 'Çalışma modu (refresh = normal saatlik yenileme, seed = ilk kurulum)'
         required: true
-        default: 'crawl'
+        default: 'refresh'
         type: choice
         options:
-          - crawl
+          - refresh
           - seed
-      scan_limit:
-        description: 'Tek seferde taranacak takım sayısı (crawl modu için)'
+      top_limit:
+        description: 'Her koşuda mutlaka yenilenecek en üst takım sayısı'
         required: false
-        default: '800'
+        default: '300'
+      rotate_limit:
+        description: 'Sırayla yenilenecek (en eski güncellenen) takım sayısı'
+        required: false
+        default: '900'
+
+concurrency:
+  group: pro-elo-refresh
+  cancel-in-progress: false
 
 jobs:
   run-pro-elo:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
-      - name: Depoyu İndir
+      - name: Depoyu indir
         uses: actions/checkout@v4
 
-      - name: Node.js 20 Kur
+      - name: Node.js 20 kur
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: İlk Kurulum (Seed) Çalıştır
+      - name: İlk kurulum (seed)
         if: ${{ github.event.inputs.mode == 'seed' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node src/seedFromStats.js
 
-      - name: Sürekli Tarayıcı (Crawler) Çalıştır
+      - name: Pro-ELO yenileme (betikle aynı formül)
         if: ${{ github.event.inputs.mode != 'seed' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SCAN_LIMIT: ${{ github.event.inputs.scan_limit || '800' }}
-        run: node src/crawler.js
+          TOP_LIMIT: ${{ github.event.inputs.top_limit || '300' }}
+          ROTATE_LIMIT: ${{ github.event.inputs.rotate_limit || '900' }}
+        run: node src/refresh.js
