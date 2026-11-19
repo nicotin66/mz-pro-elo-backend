@@ -607,10 +607,65 @@
 
         function renderCountryBadge(cc) {
             if (!cc) return '';
-            const code = cc.toUpperCase();
-            const flag = getCountryFlag(code);
+            const code = cc.toUpperCase().trim();
             const countryName = COUNTRY_NAMES[code] || code;
-            return ` • <span title="${countryName} (${code})" style="cursor:help; font-size:13.5px; vertical-align:middle; display:inline-flex; align-items:center; gap:3px;"><span>${flag}</span><strong style="color:#cbd5e1;font-size:11px;">${code}</strong></span>`;
+            const flagUrl = `https://flagcdn.com/20x15/${code.toLowerCase()}.png`;
+            return ` • <img src="${flagUrl}" alt="${code}" title="${countryName}" style="width:16px; height:12px; vertical-align:-1px; border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.6); cursor:help;" onerror="this.style.display='none'">`;
+        }
+
+        function getLeagueTier(str) {
+            if (!str) return null;
+            const s = str.toLowerCase().trim();
+            if (s.includes('top series') || s.includes('super league') || s.includes('süper lig')) return 0;
+            const m = s.match(/(?:\bdiv(?:ision)?[\s._-]*|^div)(\d+)/i);
+            if (m) return parseInt(m[1], 10);
+            return 0; // Eğer div içermeyen özel isimse (örn: Ekstraklasa, Nemzeti Bajnokság) o ülkenin en üst ligidir
+        }
+
+        function getTierStyle(tier) {
+            if (tier === 0) {
+                return {
+                    bg: 'rgba(245, 158, 11, 0.22)',
+                    border: 'rgba(245, 158, 11, 0.55)',
+                    text: '#fbbf24',
+                    icon: '👑'
+                };
+            } else if (tier === 1) {
+                return {
+                    bg: 'rgba(14, 165, 233, 0.2)',
+                    border: 'rgba(56, 189, 248, 0.5)',
+                    text: '#38bdf8',
+                    icon: '💎'
+                };
+            } else if (tier === 2) {
+                return {
+                    bg: 'rgba(16, 185, 129, 0.2)',
+                    border: 'rgba(52, 211, 153, 0.5)',
+                    text: '#34d399',
+                    icon: '🌿'
+                };
+            } else if (tier === 3) {
+                return {
+                    bg: 'rgba(168, 85, 247, 0.2)',
+                    border: 'rgba(192, 132, 252, 0.5)',
+                    text: '#c084fc',
+                    icon: '🔮'
+                };
+            } else if (tier === 4) {
+                return {
+                    bg: 'rgba(249, 115, 22, 0.2)',
+                    border: 'rgba(251, 146, 60, 0.5)',
+                    text: '#fb923c',
+                    icon: '⚡'
+                };
+            } else {
+                return {
+                    bg: 'rgba(100, 116, 139, 0.18)',
+                    border: 'rgba(148, 163, 184, 0.35)',
+                    text: '#94a3b8',
+                    icon: '⚙️'
+                };
+            }
         }
 
         function renderLeagueBadge(nat, world) {
@@ -620,21 +675,31 @@
                 return `<span style="color:#64748b;font-size:11.5px;font-weight:600;">—</span>`;
             }
 
-            const natBadge = hasNat
-                ? `<div title="Ulusal Lig: ${nat}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(30, 41, 59, 0.9); border:1px solid rgba(148, 163, 184, 0.25); border-radius:5px; padding:2px 7px; font-size:11px; color:#e2e8f0; white-space:nowrap;">
-                    <span style="font-size:11px;">🏛️</span>
-                    <span style="color:#94a3b8;font-size:10px;font-weight:700;">Ulusal:</span>
-                    <strong style="color:#f8fafc;font-weight:700;">${nat}</strong>
-                  </div>`
-                : '';
+            let natBadge = '';
+            if (hasNat) {
+                const tier = getLeagueTier(nat);
+                const st = getTierStyle(tier);
+                natBadge = `
+                    <div title="Ulusal Lig: ${nat}" style="display:inline-flex; align-items:center; gap:4px; background:${st.bg}; border:1px solid ${st.border}; border-radius:5px; padding:2px 7px; font-size:11px; color:${st.text}; white-space:nowrap;">
+                        <span style="font-size:10px;">${st.icon}</span>
+                        <span style="opacity:0.85; font-size:9.5px; font-weight:700;">Ulusal:</span>
+                        <strong style="color:#ffffff; font-weight:700;">${nat}</strong>
+                    </div>
+                `;
+            }
 
-            const worldBadge = hasWorld
-                ? `<div title="Dünya Ligi: ${world}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(30, 58, 138, 0.25); border:1px solid rgba(96, 165, 250, 0.35); border-radius:5px; padding:2px 7px; font-size:11px; color:#93c5fd; white-space:nowrap;">
-                    <span style="font-size:11px;">🌐</span>
-                    <span style="color:#60a5fa;font-size:10px;font-weight:700;">Dünya:</span>
-                    <strong style="color:#bfdbfe;font-weight:700;">${world}</strong>
-                  </div>`
-                : '';
+            let worldBadge = '';
+            if (hasWorld) {
+                const tier = getLeagueTier(world);
+                const st = getTierStyle(tier);
+                worldBadge = `
+                    <div title="Dünya Ligi: ${world}" style="display:inline-flex; align-items:center; gap:4px; background:${st.bg}; border:1px solid ${st.border}; border-radius:5px; padding:2px 7px; font-size:11px; color:${st.text}; white-space:nowrap;">
+                        <span style="font-size:10px;">🌐</span>
+                        <span style="opacity:0.85; font-size:9.5px; font-weight:700;">Dünya:</span>
+                        <strong style="color:#ffffff; font-weight:700;">${world}</strong>
+                    </div>
+                `;
+            }
 
             return `<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
                 ${natBadge}
@@ -666,7 +731,7 @@
                 `;
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Form Sıralaması:</strong> ${periodLabel} içinde oynanan maçlardan kazanılan net Pro-ELO puanı (+ / -)</span>
-                    <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Lig Seviyesi:</strong> 🏛️ Ulusal Lig & 🌐 Dünya Ligi seviyeleri</span>
+                    <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Güncel canlı hibrit puanı</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Güncel bağımsız çapa puanı</span>
                 `;
@@ -685,7 +750,7 @@
                 `;
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
-                    <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Lig Seviyesi:</strong> 🏛️ Ulusal Lig & 🌐 Dünya Ligi seviyeleri</span>
+                    <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Canlı Statsxente + 30 günlük maç farkı (betikle aynı)</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
                 `;
