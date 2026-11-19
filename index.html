@@ -570,7 +570,7 @@
                     <tr>
                         <th style="width: 80px;">Sıra</th>
                         <th>Takım Bilgisi</th>
-                        <th style="width: 175px;">Lig Seviyesi</th>
+                        <th style="width: 195px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
                         <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
                         <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
@@ -752,6 +752,55 @@
             </div>`;
         }
 
+        function renderYouthLeagueBadge(seniorNat, seniorWorld, youthNat, youthWorld, catLabel) {
+            const hasSenior = Boolean(seniorNat || seniorWorld);
+            const hasYouth = Boolean(youthNat || youthWorld);
+            if (!hasSenior && !hasYouth) {
+                return `<span style="color:#64748b;font-size:11.5px;font-weight:600;">—</span>`;
+            }
+
+            let seniorBadge = '';
+            if (hasSenior) {
+                const tier = getLeagueTier(seniorNat || seniorWorld);
+                const st = getTierStyle(tier);
+                const sNatText = seniorNat || '—';
+                seniorBadge = `
+                    <div title="Kulüp Ana Ligi (Senior): ${sNatText}${seniorWorld ? ' • Dünya Ligi: ' + seniorWorld : ''}" style="display:inline-flex; align-items:center; gap:4px; background:${st.bg}; border:1px solid ${st.border}; border-radius:5px; padding:2px 6px; font-size:10.5px; color:${st.text}; white-space:nowrap;">
+                        <span style="font-size:10px;">🏠</span>
+                        <span style="opacity:0.85; font-size:9px; font-weight:700;">Ana:</span>
+                        <strong style="color:#ffffff; font-weight:700;">${sNatText}</strong>
+                        ${seniorWorld ? `<span style="opacity:0.75; font-size:9px;">(🌐 ${seniorWorld})</span>` : ''}
+                    </div>
+                `;
+            }
+
+            let youthBadge = '';
+            if (hasYouth) {
+                const tier = getLeagueTier(youthNat || youthWorld);
+                const st = getTierStyle(tier);
+                const yNatText = youthNat || '—';
+                youthBadge = `
+                    <div title="${catLabel} Ligi: ${yNatText}${youthWorld ? ' • Dünya: ' + youthWorld : ''}" style="display:inline-flex; align-items:center; gap:4px; background:${st.bg}; border:1px solid ${st.border}; border-radius:5px; padding:2px 6px; font-size:10.5px; color:${st.text}; white-space:nowrap;">
+                        <span style="font-size:10px;">${st.icon}</span>
+                        <span style="opacity:0.85; font-size:9px; font-weight:700;">${catLabel}:</span>
+                        <strong style="color:#ffffff; font-weight:700;">${yNatText}</strong>
+                        ${youthWorld ? `<span style="opacity:0.75; font-size:9px;">(🌐 ${youthWorld})</span>` : ''}
+                    </div>
+                `;
+            } else {
+                youthBadge = `
+                    <div style="font-size:10px; color:#64748b; padding:1px 4px;">
+                        <span>${catLabel} ligi yok</span>
+                    </div>
+                `;
+            }
+
+            return `<div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
+                ${seniorBadge}
+                ${youthBadge}
+            </div>`;
+        }
+
         function updateHeadersAndLegend() {
             const thead = document.getElementById('tableHead');
             const legend = document.getElementById('legendBar');
@@ -766,7 +815,7 @@
                     <tr>
                         <th style="width: 80px;">Sıra</th>
                         <th>Takım Bilgisi</th>
-                        <th style="width: 175px;">Lig Seviyesi</th>
+                        <th style="width: 195px;">Lig Seviyesi</th>
                         <th style="width: 140px; text-align: right;">Form Değişim (${periodLabel})</th>
                         <th style="width: 105px; text-align: center;">Dönem Maçı</th>
                         <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
@@ -777,6 +826,7 @@
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Form Sıralaması:</strong> ${periodLabel} içinde oynanan maçlardan kazanılan net Pro-ELO puanı (+ / -)</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
+                    <span><span class="legend-dot" style="background:#38bdf8;"></span><strong>Genç Sekmeleri:</strong> 🏠 Ana Lig (A-Takım) ve 🏅 Kategori Ligi birlikte gösterilir</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Güncel canlı hibrit puanı</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Güncel bağımsız çapa puanı</span>
                 `;
@@ -785,7 +835,7 @@
                     <tr>
                         <th style="width: 80px;">Sıra</th>
                         <th>Takım Bilgisi</th>
-                        <th style="width: 175px;">Lig Seviyesi</th>
+                        <th style="width: 195px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
                         <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
                         <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
@@ -796,6 +846,7 @@
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
+                    <span><span class="legend-dot" style="background:#38bdf8;"></span><strong>Genç Sekmeleri:</strong> 🏠 Ana Lig (A-Takım) ve 🏅 Kategori Ligi birlikte gösterilir</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Canlı Statsxente + 30 günlük maç farkı (betikle aynı)</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
                 `;
@@ -1028,7 +1079,9 @@
                         const fSign = fDelta > 0 ? `+${fDelta.toFixed(1)}` : fDelta.toFixed(1);
                         const fCls = fDelta > 0 ? 'color:#4ade80;' : (fDelta < 0 ? 'color:#f87171;' : 'color:#94a3b8;');
                         const countryBadge = renderCountryBadge(t.country);
-                        const leagueHtml = renderLeagueBadge(t.nat_league, t.world_league);
+                        const leagueHtml = (currentAge === 'senior')
+                            ? renderLeagueBadge(t.nat_league, t.world_league)
+                            : renderYouthLeagueBadge(t.senior_league, t.senior_wleague, t.nat_league, t.world_league, currentAge.toUpperCase());
                         const mzLink = `https://www.managerzone.com/?p=team&tid=${t.tid}`;
 
                         const tr = document.createElement('tr');
@@ -1078,8 +1131,8 @@
             const orderCol = (v2Ready && sortMode === 'ind') ? indCol : hybCol;
 
             const selectCols = v2Ready
-                ? `tid,name,country,${hybCol},${indCol},${snapCol},ind_matches,${natCol},${wCol}`
-                : `tid,name,country,${hybCol},${natCol},${wCol}`;
+                ? `tid,name,country,${hybCol},${indCol},${snapCol},ind_matches,league_senior,wleague_senior,${natCol},${wCol}`
+                : `tid,name,country,${hybCol},league_senior,wleague_senior,${natCol},${wCol}`;
 
             let url = `${SUPABASE_URL}/rest/v1/mz_teams?select=${selectCols}&order=${orderCol}.desc.nullslast&limit=${PAGE_SIZE}&offset=${offset}`;
 
@@ -1158,7 +1211,9 @@
                     const indMatchesNote = (t.ind_matches && t.ind_matches > 0) ? ` • ${t.ind_matches} bağ. maç` : '';
                     const natLeague = t[natCol] || null;
                     const worldLeague = t[wCol] || null;
-                    const leagueHtml = renderLeagueBadge(natLeague, worldLeague);
+                    const leagueHtml = (currentAge === 'senior')
+                        ? renderLeagueBadge(natLeague, worldLeague)
+                        : renderYouthLeagueBadge(t.league_senior, t.wleague_senior, natLeague, worldLeague, currentAge.toUpperCase());
                     const mzLink = `https://www.managerzone.com/?p=team&tid=${t.tid}`;
 
                     const tr = document.createElement('tr');
