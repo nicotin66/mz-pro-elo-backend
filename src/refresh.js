@@ -178,6 +178,14 @@ async function main() {
             const matches = toScriptMatches(raw, tid);
             let name = team.name || '';
             let country = team.country || '';
+            let leagueSenior = team.league_senior || null;
+            let wleagueSenior = team.wleague_senior || null;
+            let leagueU23 = team.league_u23 || null;
+            let wleagueU23 = team.wleague_u23 || null;
+            let leagueU21 = team.league_u21 || null;
+            let wleagueU21 = team.wleague_u21 || null;
+            let leagueU18 = team.league_u18 || null;
+            let wleagueU18 = team.wleague_u18 || null;
 
             for (const m of raw) {
                 const self = Number(m.home.tid) === tid ? m.home : m.away;
@@ -192,6 +200,17 @@ async function main() {
                     if (!d.name && opp.name) d.name = opp.name;
                     if (!d.country && opp.country) d.country = opp.country;
                 }
+                const rawType = (m.rawType || '').toLowerCase();
+                const typeName = m.typeName || '';
+                if (rawType === 'league' && typeName) leagueSenior = typeName;
+                else if (rawType === 'world_league' && typeName) wleagueSenior = typeName;
+                else if (rawType === 'u23_league' && typeName) leagueU23 = typeName;
+                else if (rawType === 'u23_world_league' && typeName) wleagueU23 = typeName;
+                else if (rawType === 'u21_league' && typeName) leagueU21 = typeName;
+                else if (rawType === 'u21_world_league' && typeName) wleagueU21 = typeName;
+                else if (rawType === 'u18_league' && typeName) leagueU18 = typeName;
+                else if (rawType === 'u18_world_league' && typeName) wleagueU18 = typeName;
+
                 if (snapshotCutoff && m.date && String(m.date) >= snapshotCutoff && !postCutoffMatches.has(m.mid)) {
                     postCutoffMatches.set(m.mid, m);
                 }
@@ -213,6 +232,14 @@ async function main() {
                 u21_elo: r.u21.proElo,
                 u18_elo: r.u18.proElo,
                 senior_matches: r.senior.matchCount,
+                league_senior: leagueSenior,
+                wleague_senior: wleagueSenior,
+                league_u23: leagueU23,
+                wleague_u23: wleagueU23,
+                league_u21: leagueU21,
+                wleague_u21: wleagueU21,
+                league_u18: leagueU18,
+                wleague_u18: wleagueU18,
                 last_scanned_at: nowIso,
                 updated_at: nowIso
             });
@@ -387,6 +414,14 @@ async function main() {
             u21_elo: row.u21_elo,
             u18_elo: row.u18_elo,
             senior_matches: row.senior_matches || 0,
+            league_senior: row.league_senior || null,
+            wleague_senior: row.wleague_senior || null,
+            league_u23: row.league_u23 || null,
+            wleague_u23: row.wleague_u23 || null,
+            league_u21: row.league_u21 || null,
+            wleague_u21: row.wleague_u21 || null,
+            league_u18: row.league_u18 || null,
+            wleague_u18: row.wleague_u18 || null,
             last_scanned_at: row.last_scanned_at || null,
             updated_at: row.updated_at || nowIso
         };

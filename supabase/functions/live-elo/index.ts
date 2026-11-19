@@ -95,11 +95,32 @@ interface ParsedMatch {
   oppTid: string;
 }
 
+interface LeaguesInfo {
+  league_senior: string | null;
+  wleague_senior: string | null;
+  league_u23: string | null;
+  wleague_u23: string | null;
+  league_u21: string | null;
+  wleague_u21: string | null;
+  league_u18: string | null;
+  wleague_u18: string | null;
+}
+
 function parseMatchlistXml(xmlText: string, selfTid: number) {
   const matches: ParsedMatch[] = [];
   let teamName = '';
   let country = '';
-  if (!xmlText || !xmlText.includes('<Match')) return { matches, teamName, country };
+  const leagues: LeaguesInfo = {
+    league_senior: null,
+    wleague_senior: null,
+    league_u23: null,
+    wleague_u23: null,
+    league_u21: null,
+    wleague_u21: null,
+    league_u18: null,
+    wleague_u18: null
+  };
+  if (!xmlText || !xmlText.includes('<Match')) return { matches, teamName, country, leagues };
 
   const matchRegex = /<Match\b([^>]*)>([\s\S]*?)<\/Match>/gi;
   let m;
@@ -117,6 +138,15 @@ function parseMatchlistXml(xmlText: string, selfTid: number) {
     const rawType = getAttr(attrs, 'type').toLowerCase();
     const typeName = getAttr(attrs, 'typeName');
     if (!mid || (status && status !== 'played' && status !== '1')) continue;
+
+    if (rawType === 'league' && !leagues.league_senior && typeName) leagues.league_senior = typeName;
+    else if (rawType === 'world_league' && !leagues.wleague_senior && typeName) leagues.wleague_senior = typeName;
+    else if (rawType === 'u23_league' && !leagues.league_u23 && typeName) leagues.league_u23 = typeName;
+    else if (rawType === 'u23_world_league' && !leagues.wleague_u23 && typeName) leagues.wleague_u23 = typeName;
+    else if (rawType === 'u21_league' && !leagues.league_u21 && typeName) leagues.league_u21 = typeName;
+    else if (rawType === 'u21_world_league' && !leagues.wleague_u21 && typeName) leagues.wleague_u21 = typeName;
+    else if (rawType === 'u18_league' && !leagues.league_u18 && typeName) leagues.league_u18 = typeName;
+    else if (rawType === 'u18_world_league' && !leagues.wleague_u18 && typeName) leagues.wleague_u18 = typeName;
 
     const teamRegex = /<Team\b([^>]*)\/?>/gi;
     const teams: Array<{ tid: number; name: string; country: string; field: string; goals: number }> = [];
@@ -151,7 +181,7 @@ function parseMatchlistXml(xmlText: string, selfTid: number) {
       oppTid: String(opp.tid)
     });
   }
-  return { matches, teamName, country };
+  return { matches, teamName, country, leagues };
 }
 
 type EloSet = { senior: number | null; u23: number | null; u21: number | null; u18: number | null };
@@ -290,7 +320,7 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const xml = xmlRes.ok ? await xmlRes.text() : '';
-    const { matches, teamName, country } = parseMatchlistXml(xml, tid);
+    const { matches, teamName, country, leagues } = parseMatchlistXml(xml, tid);
     const existing = Array.isArray(existingRes) && existingRes.length ? existingRes[0] : null;
 
     // 2) Takım + tüm rakiplerin canlı Statsxente ELO'larını paralel çek
@@ -321,6 +351,14 @@ Deno.serve(async (req: Request) => {
       last_scanned_at: nowIso,
       updated_at: nowIso
     };
+    if (leagues?.league_senior) row.league_senior = leagues.league_senior;
+    if (leagues?.wleague_senior) row.wleague_senior = leagues.wleague_senior;
+    if (leagues?.league_u23) row.league_u23 = leagues.league_u23;
+    if (leagues?.wleague_u23) row.wleague_u23 = leagues.wleague_u23;
+    if (leagues?.league_u21) row.league_u21 = leagues.league_u21;
+    if (leagues?.wleague_u21) row.wleague_u21 = leagues.wleague_u21;
+    if (leagues?.league_u18) row.league_u18 = leagues.league_u18;
+    if (leagues?.wleague_u18) row.wleague_u18 = leagues.wleague_u18;
     // Takımın henüz çapası yoksa ilk kez buradan çapa başlat
     if (!existing || !existing.snap_at) {
       row.snap_senior = selfStats.senior;
@@ -380,6 +418,24 @@ Deno.serve(async (req: Request) => {
         matches: existing?.ind_matches || 0
       },
       totalMatchesScanned: matches.length,
+      leagues: {
+        senior: {
+          national: row.league_senior || existing?.league_senior || null,
+          world: row.wleague_senior || existing?.wleague_senior || null
+        },
+        u23: {
+          national: row.league_u23 || existing?.league_u23 || null,
+          world: row.wleague_u23 || existing?.wleague_u23 || null
+        },
+        u21: {
+          national: row.league_u21 || existing?.league_u21 || null,
+          world: row.wleague_u21 || existing?.wleague_u21 || null
+        },
+        u18: {
+          national: row.league_u18 || existing?.league_u18 || null,
+          world: row.wleague_u18 || existing?.wleague_u18 || null
+        }
+      },
       computedAt: nowIso
     }), { status: 200, headers: CORS_HEADERS });
   } catch (err) {
