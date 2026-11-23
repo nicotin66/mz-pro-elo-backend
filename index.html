@@ -989,7 +989,7 @@
                         if (meta.last_refresh_stats) {
                             try {
                                 const st = JSON.parse(meta.last_refresh_stats);
-                                extra = ` • Son tur: ${st.scannedTeams} takım, ${st.indScoredMatches} yeni maç`;
+                                extra = ` • Son tur: ${st.scannedTeams} takım, ${st.indScoredMatches} etki eden yeni maç`;
                             } catch (_) {}
                         }
                         document.getElementById('stat-snapshot-info').textContent = `Çapa: ${snapTr}${extra}`;
