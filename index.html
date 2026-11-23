@@ -494,6 +494,7 @@
                 <h1>
                     <span>⚽ MZ Pro-ELO Çift-Model Laboratuvarı</span>
                     <span class="badge-live">100 Ülke • Anlık Motor</span>
+                    <span class="badge-live" id="seasonBadge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24;"></span>
                 </h1>
                 <p><strong>Statsxente ELO</strong> ve <strong>18.11.2026 Bağımsız Pro-ELO</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
             </div>
@@ -541,6 +542,7 @@
             </div>
             <div class="time-tabs">
                 <button class="time-btn active" data-days="0">🌐 Tüm Zamanlar</button>
+                <button class="time-btn" data-days="season" id="seasonFilterBtn" style="border-color: rgba(245, 158, 11, 0.4); color: #fef08a;">🏆 Bu Sezon (Sezon 100)</button>
                 <button class="time-btn" data-days="60">📅 Son 2 Ay</button>
                 <button class="time-btn" data-days="30">📆 Son 1 Ay</button>
                 <button class="time-btn" data-days="15">⚡ Son 15 Gün</button>
@@ -601,10 +603,44 @@
         let currentAge = 'senior';
         let sortMode = 'hybrid';
         let timePeriodDays = 0; // 0 = Tüm Zamanlar, 7 = 1 Hafta, 15 = 15 Gün, 30 = 1 Ay, 60 = 2 Ay
+        let timePeriodMode = null; // 'season' | null
         let currentPage = 1;
         const PAGE_SIZE = 50;
         let searchQuery = '';
         let v2Ready = true;
+
+        function getMzSeasonInfo(date = new Date()) {
+            const baseDate = new Date('2026-09-29T00:00:00Z');
+            const targetDate = new Date(date.toISOString().split('T')[0] + 'T00:00:00Z');
+            const dayDiff = Math.round((targetDate - baseDate) / 86400000);
+            const season = 100 + Math.floor(dayDiff / 91);
+            const day = ((dayDiff % 91) + 91) % 91 + 1;
+            const week = Math.floor((day - 1) / 7) + 1;
+            const remainingDays = 91 - day;
+            const seasonStartDate = new Date(targetDate.getTime() - ((day - 1) * 86400000));
+            const startYyyy = seasonStartDate.getFullYear();
+            const startMm = String(seasonStartDate.getMonth() + 1).padStart(2, '0');
+            const startDd = String(seasonStartDate.getDate()).padStart(2, '0');
+            return {
+                season,
+                week,
+                day,
+                remainingDays,
+                seasonStartStr: `${startYyyy}-${startMm}-${startDd} 00:00`
+            };
+        }
+
+        function updateSeasonBadge() {
+            const info = getMzSeasonInfo();
+            const badge = document.getElementById('seasonBadge');
+            if (badge) {
+                badge.innerHTML = `🏆 Sezon ${info.season} • Hafta ${info.week} • Gün ${info.day}/91 <span style="opacity:0.75;font-size:10px;">(Kalan: ${info.remainingDays} gün)</span>`;
+            }
+            const seasonBtn = document.getElementById('seasonFilterBtn');
+            if (seasonBtn) {
+                seasonBtn.innerHTML = `🏆 Bu Sezon (Sezon ${info.season})`;
+            }
+        }
 
         function getSinceDateStr(days) {
             if (!days || days <= 0) return null;
@@ -755,9 +791,11 @@
         function updateHeadersAndLegend() {
             const thead = document.getElementById('tableHead');
             const legend = document.getElementById('legendBar');
-            if (timePeriodDays > 0) {
+            if (timePeriodDays > 0 || timePeriodMode === 'season') {
+                const sInfo = getMzSeasonInfo();
                 let periodLabel = 'Seçilen Dönem';
-                if (timePeriodDays === 7) periodLabel = 'Son 1 Hafta';
+                if (timePeriodMode === 'season') periodLabel = `Sezon ${sInfo.season} (Gün 1–${sInfo.day})`;
+                else if (timePeriodDays === 7) periodLabel = 'Son 1 Hafta';
                 else if (timePeriodDays === 15) periodLabel = 'Son 15 Gün';
                 else if (timePeriodDays === 30) periodLabel = 'Son 1 Ay';
                 else if (timePeriodDays === 60) periodLabel = 'Son 2 Ay';
@@ -775,7 +813,7 @@
                     </tr>
                 `;
                 legend.innerHTML = `
-                    <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Form Sıralaması:</strong> ${periodLabel} içinde oynanan maçlardan kazanılan net Pro-ELO puanı (+ / -)</span>
+                    <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Sezon / Form Sıralaması:</strong> ${periodLabel} içinde oynanan maçlardan kazanılan net Pro-ELO puanı (+ / -)</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan güncel Statsxente puanı</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Güncel bağımsız çapa puanı</span>
@@ -965,10 +1003,11 @@
             const trimmed = searchQuery.trim();
 
             // -------------------------------------------------------------
-            // FORM SIRALAMASI MODU (Son 7/15/30/60 gün)
+            // SEZON / FORM SIRALAMASI MODU (Bu Sezon veya Son 7/15/30/60 gün)
             // -------------------------------------------------------------
-            if (timePeriodDays > 0) {
-                const sinceStr = getSinceDateStr(timePeriodDays);
+            if (timePeriodDays > 0 || timePeriodMode === 'season') {
+                const sInfo = getMzSeasonInfo();
+                const sinceStr = (timePeriodMode === 'season') ? sInfo.seasonStartStr : getSinceDateStr(timePeriodDays);
                 try {
                     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_form_rankings`, {
                         method: 'POST',
@@ -1002,12 +1041,15 @@
                     const total = Number(teams[0].total_count || teams.length);
                     if (currentPage === 1 && !trimmed) {
                         let periodText = timePeriodDays + ' Günlük';
-                        if (timePeriodDays === 7) periodText = '1 Haftalık';
+                        if (timePeriodMode === 'season') periodText = `Sezon ${sInfo.season} (${sInfo.day}. Gün)`;
+                        else if (timePeriodDays === 7) periodText = '1 Haftalık';
                         else if (timePeriodDays === 15) periodText = '15 Günlük';
                         else if (timePeriodDays === 30) periodText = '1 Aylık';
                         else if (timePeriodDays === 60) periodText = '2 Aylık';
 
-                        document.getElementById('stat-top-label').textContent = `🔥 Form Lideri (${periodText})`;
+                        document.getElementById('stat-top-label').textContent = (timePeriodMode === 'season')
+                            ? `🏆 Sezon ${sInfo.season} Lideri`
+                            : `🔥 Form Lideri (${periodText})`;
                         document.getElementById('stat-top-team').textContent = teams[0].name || `Takım #${teams[0].tid}`;
                         const fd = Number(teams[0].form_delta || 0);
                         const fdStr = fd > 0 ? `+${fd.toFixed(1)}` : fd.toFixed(1);
@@ -1205,8 +1247,14 @@
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                timePeriodDays = parseInt(btn.dataset.days, 10);
-                if (timePeriodDays > 0) {
+                if (btn.dataset.days === 'season') {
+                    timePeriodMode = 'season';
+                    timePeriodDays = 0;
+                } else {
+                    timePeriodMode = null;
+                    timePeriodDays = parseInt(btn.dataset.days, 10);
+                }
+                if (timePeriodDays > 0 || timePeriodMode === 'season') {
                     // Form sıralamasında standart sıralama butonlarını nötrle
                     document.getElementById('sortHybridBtn').classList.remove('active-hybrid');
                     document.getElementById('sortIndBtn').classList.remove('active-ind');
@@ -1214,10 +1262,13 @@
                     // Tüm Zamanlar'a dönünce seçili moda göre renklendir
                     if (sortMode === 'ind') {
                         document.getElementById('sortIndBtn').classList.add('active-ind');
+                        document.getElementById('sortHybridBtn').classList.remove('active-hybrid');
                     } else {
                         document.getElementById('sortHybridBtn').classList.add('active-hybrid');
+                        document.getElementById('sortIndBtn').classList.remove('active-ind');
                     }
                 }
+                updateHeadersAndLegend();
                 currentPage = 1;
                 loadRankings();
             });
@@ -1226,10 +1277,12 @@
         document.getElementById('sortHybridBtn').addEventListener('click', () => {
             sortMode = 'hybrid';
             timePeriodDays = 0;
+            timePeriodMode = null;
             document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.time-btn[data-days="0"]').classList.add('active');
             document.getElementById('sortHybridBtn').classList.add('active-hybrid');
             document.getElementById('sortIndBtn').classList.remove('active-ind');
+            updateHeadersAndLegend();
             currentPage = 1;
             loadRankings();
         });
@@ -1237,10 +1290,12 @@
         document.getElementById('sortIndBtn').addEventListener('click', () => {
             sortMode = 'ind';
             timePeriodDays = 0;
+            timePeriodMode = null;
             document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.time-btn[data-days="0"]').classList.add('active');
             document.getElementById('sortIndBtn').classList.add('active-ind');
             document.getElementById('sortHybridBtn').classList.remove('active-hybrid');
+            updateHeadersAndLegend();
             currentPage = 1;
             loadRankings();
         });
@@ -1314,6 +1369,7 @@
             currentPage++; loadRankings();
         });
 
+        updateSeasonBadge();
         fetchStatsAndMeta().then(() => loadRankings());
     </script>
 </body>
