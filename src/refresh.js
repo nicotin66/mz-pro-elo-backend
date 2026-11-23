@@ -129,7 +129,18 @@ async function pickQueue(hasIndColumns) {
         });
     }
 
-    // 3) Aktif takımlardan en uzun süredir taranmamış olanlar (bot/ölü kulüpler hariç!)
+    // 3) Formda olup lig bilgisi eksik olan aktif takımları öncelikle kuyruğa al
+    if (hasIndColumns) {
+        const missingLeagues = await fetchPaged(
+            'mz_teams?select=tid,name,country&league_senior=is.null&ind_senior_matches=gt.3&order=ind_senior_matches.desc',
+            150
+        );
+        missingLeagues.forEach(t => {
+            if (!map.has(Number(t.tid))) map.set(Number(t.tid), t);
+        });
+    }
+
+    // 4) Aktif takımlardan en uzun süredir taranmamış olanlar (bot/ölü kulüpler hariç!)
     const activeFilter = hasIndColumns
         ? '&or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null)'
         : '&senior_elo=not.is.null';
@@ -346,6 +357,37 @@ async function main() {
         if (m.away.name) awayRow.name = m.away.name;
         if (m.away.country) awayRow.country = m.away.country;
 
+        // Maç lig maçı ise her iki takımın lig seviyesini güncelle
+        const mRawType = (m.rawType || '').toLowerCase();
+        const mTypeName = m.typeName || '';
+        if (mTypeName) {
+            if (mRawType === 'league') {
+                if (!homeRow.league_senior) homeRow.league_senior = mTypeName;
+                if (!awayRow.league_senior) awayRow.league_senior = mTypeName;
+            } else if (mRawType === 'world_league') {
+                if (!homeRow.wleague_senior) homeRow.wleague_senior = mTypeName;
+                if (!awayRow.wleague_senior) awayRow.wleague_senior = mTypeName;
+            } else if (mRawType === 'u23_league') {
+                if (!homeRow.league_u23) homeRow.league_u23 = mTypeName;
+                if (!awayRow.league_u23) awayRow.league_u23 = mTypeName;
+            } else if (mRawType === 'u23_world_league') {
+                if (!homeRow.wleague_u23) homeRow.wleague_u23 = mTypeName;
+                if (!awayRow.wleague_u23) awayRow.wleague_u23 = mTypeName;
+            } else if (mRawType === 'u21_league') {
+                if (!homeRow.league_u21) homeRow.league_u21 = mTypeName;
+                if (!awayRow.league_u21) awayRow.league_u21 = mTypeName;
+            } else if (mRawType === 'u21_world_league') {
+                if (!homeRow.wleague_u21) homeRow.wleague_u21 = mTypeName;
+                if (!awayRow.wleague_u21) awayRow.wleague_u21 = mTypeName;
+            } else if (mRawType === 'u18_league') {
+                if (!homeRow.league_u18) homeRow.league_u18 = mTypeName;
+                if (!awayRow.league_u18) awayRow.league_u18 = mTypeName;
+            } else if (mRawType === 'u18_world_league') {
+                if (!homeRow.wleague_u18) homeRow.wleague_u18 = mTypeName;
+                if (!awayRow.wleague_u18) awayRow.wleague_u18 = mTypeName;
+            }
+        }
+
         const age = classifyCategory(m.rawType, m.typeName);
         const col = `ind_${age}_elo`;
         const defaultStart = age === 'senior' ? 1200 : 1000;
@@ -396,6 +438,14 @@ async function main() {
             existing.senior_matches = h.senior_matches;
             existing.last_scanned_at = h.last_scanned_at;
             existing.updated_at = h.updated_at;
+            if (h.league_senior) existing.league_senior = h.league_senior;
+            if (h.wleague_senior) existing.wleague_senior = h.wleague_senior;
+            if (h.league_u23) existing.league_u23 = h.league_u23;
+            if (h.wleague_u23) existing.wleague_u23 = h.wleague_u23;
+            if (h.league_u21) existing.league_u21 = h.league_u21;
+            if (h.wleague_u21) existing.wleague_u21 = h.wleague_u21;
+            if (h.league_u18) existing.league_u18 = h.league_u18;
+            if (h.wleague_u18) existing.wleague_u18 = h.wleague_u18;
         } else {
             teamStateMap.set(tid, h);
         }
