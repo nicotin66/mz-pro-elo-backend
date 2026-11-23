@@ -216,22 +216,19 @@ async function main() {
                 }
             }
 
-            // ---- MODEL 1 (Hibrit: Canlı Statsxente + 30 günlük Pro-Stats farkı) ----
+            // ---- MODEL 1 (Doğrudan Canlı Statsxente ELO Değerleri) ----
             await ensureStats([tid, ...matches.map(m => m.oppTid)]);
             const selfStats = statsCache.get(tid) || { senior: null, u23: null, u21: null, u18: null };
-            const oppElos = {};
-            matches.forEach(m => { oppElos[m.oppTid] = statsCache.get(Number(m.oppTid)); });
 
-            const r = computeProElo(selfStats, matches, oppElos);
             hybridResults.set(tid, {
                 tid,
                 name,
                 country,
-                senior_elo: r.senior.proElo,
-                u23_elo: r.u23.proElo,
-                u21_elo: r.u21.proElo,
-                u18_elo: r.u18.proElo,
-                senior_matches: r.senior.matchCount,
+                senior_elo: selfStats.senior,
+                u23_elo: selfStats.u23,
+                u21_elo: selfStats.u21,
+                u18_elo: selfStats.u18,
+                senior_matches: matches.length,
                 league_senior: leagueSenior,
                 wleague_senior: wleagueSenior,
                 league_u23: leagueU23,
@@ -247,7 +244,7 @@ async function main() {
             done++;
             if (done % 500 === 0 || ONLY_TIDS.length) {
                 const elapsed = Math.round((Date.now() - started) / 1000);
-                console.log(`  ${done}/${queue.length} (${elapsed}s) | ${name} (#${tid}) Hibrit Senior: ${selfStats.senior} ${r.senior.adjustment >= 0 ? '+' : ''}${r.senior.adjustment} = ${r.senior.proElo}`);
+                console.log(`  ${done}/${queue.length} (${elapsed}s) | ${name} (#${tid}) Statsxente Senior: ${selfStats.senior}`);
             }
         }
     }

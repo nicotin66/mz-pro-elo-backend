@@ -495,7 +495,7 @@
                     <span>⚽ MZ Pro-ELO Çift-Model Laboratuvarı</span>
                     <span class="badge-live">100 Ülke • Anlık Motor</span>
                 </h1>
-                <p><strong>Hibrit (Stats + Fark)</strong> ve <strong>18.11.2026 Bağımsız Model</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
+                <p><strong>Statsxente ELO</strong> ve <strong>18.11.2026 Bağımsız Pro-ELO</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
             </div>
             <a href="https://github.com/nicotin66/mz-pro-elo-backend" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 12px; font-weight: 600;">
                 GitHub Deposu ↗
@@ -519,7 +519,7 @@
             <div class="stat-card">
                 <div class="stat-label" id="stat-top-label">Dünya #1 Senior</div>
                 <div class="stat-value" id="stat-top-team" style="font-size: 18px; color: #fbbf24;">...</div>
-                <div class="stat-desc" id="stat-top-elo">Hibrit: ... • Bağımsız: ...</div>
+                <div class="stat-desc" id="stat-top-elo">Statsxente: ... • Bağımsız: ...</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Son Güncelleme (TR)</div>
@@ -536,7 +536,7 @@
                 <button class="tab-btn" data-age="u18">🥇 U18</button>
             </div>
             <div class="sort-tabs">
-                <button class="sort-btn active-hybrid" id="sortHybridBtn">⚡ Hibrit Sırala</button>
+                <button class="sort-btn active-hybrid" id="sortHybridBtn">📊 Stats Sırala</button>
                 <button class="sort-btn" id="sortIndBtn">🧭 Bağımsız Sırala</button>
             </div>
             <div class="time-tabs">
@@ -560,7 +560,7 @@
 
         <div class="legend-bar" id="legendBar">
             <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
-            <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Canlı Statsxente + 30 günlük maç farkı (betikle aynı)</span>
+            <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan canlı Statsxente puanı</span>
             <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
         </div>
 
@@ -572,9 +572,9 @@
                         <th>Takım Bilgisi</th>
                         <th style="width: 175px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
-                        <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
+                        <th style="width: 130px; text-align: right;">Statsxente ELO</th>
                         <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
-                        <th style="width: 105px; text-align: right;">Fark (Bağ−Hib)</th>
+                        <th style="width: 105px; text-align: right;">Fark (Bağ−Stats)</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
                 </thead>
@@ -769,7 +769,7 @@
                         <th style="width: 175px;">Lig Seviyesi</th>
                         <th style="width: 140px; text-align: right;">Form Değişim (${periodLabel})</th>
                         <th style="width: 105px; text-align: center;">Dönem Maçı</th>
-                        <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
+                        <th style="width: 130px; text-align: right;">Statsxente ELO</th>
                         <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
@@ -777,7 +777,7 @@
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Form Sıralaması:</strong> ${periodLabel} içinde oynanan maçlardan kazanılan net Pro-ELO puanı (+ / -)</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
-                    <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Güncel canlı hibrit puanı</span>
+                    <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan güncel Statsxente puanı</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Güncel bağımsız çapa puanı</span>
                 `;
             } else {
@@ -787,16 +787,16 @@
                         <th>Takım Bilgisi</th>
                         <th style="width: 175px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
-                        <th style="width: 130px; text-align: right;">Hibrit Pro-ELO</th>
+                        <th style="width: 130px; text-align: right;">Statsxente ELO</th>
                         <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
-                        <th style="width: 105px; text-align: right;">Fark (Bağ−Hib)</th>
+                        <th style="width: 105px; text-align: right;">Fark (Bağ−Stats)</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
                 `;
                 legend.innerHTML = `
                     <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
-                    <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Hibrit Pro-ELO:</strong> Canlı Statsxente + 30 günlük maç farkı (betikle aynı)</span>
+                    <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan canlı Statsxente puanı</span>
                     <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
                 `;
             }
@@ -879,9 +879,8 @@
                     return `
                         <div class="live-cat-box">
                             <div class="live-cat-title">${c.label}</div>
-                            <div class="live-cat-nums"><span>Statsxente:</span><strong>${st}</strong></div>
-                            <div class="live-cat-nums"><span>Hibrit Pro-ELO:</span><strong style="color:#60a5fa;">${hy} (${dfStr})</strong></div>
-                            <div class="live-cat-nums"><span>Bağımsız (18.11):</span><strong style="color:#34d399;">${ind}</strong></div>
+                            <div class="live-cat-nums"><span>Statsxente ELO:</span><strong style="color:#60a5fa;">${st}</strong></div>
+                            <div class="live-cat-nums"><span>Bağımsız Pro-ELO:</span><strong style="color:#34d399;">${ind}</strong></div>
                             ${lgHtml}
                         </div>
                     `;
@@ -1115,11 +1114,11 @@
 
                 if (currentPage === 1 && !trimmed) {
                     const ageLabel = currentAge.toUpperCase();
-                    const modeLabel = (v2Ready && sortMode === 'ind') ? 'Bağımsız' : 'Hibrit';
+                    const modeLabel = (v2Ready && sortMode === 'ind') ? 'Bağımsız' : 'Statsxente';
                     document.getElementById('stat-top-label').textContent = `Dünya #1 ${ageLabel} (${modeLabel})`;
                     document.getElementById('stat-top-team').textContent = teams[0].name || `Takım #${teams[0].tid}`;
                     document.getElementById('stat-top-elo').textContent =
-                        `Hibrit: ${fmtNum(teams[0][hybCol])} • Bağımsız: ${fmtNum(teams[0][indCol])}`;
+                        `Statsxente: ${fmtNum(teams[0][hybCol])} • Bağımsız: ${fmtNum(teams[0][indCol])}`;
                 }
 
                 // Arama yapıldığında her takımın gerçek dünya sırasını veritabanından hesapla

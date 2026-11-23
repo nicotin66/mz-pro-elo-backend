@@ -343,11 +343,11 @@ Deno.serve(async (req: Request) => {
       tid,
       name: teamName || existing?.name || `Takım #${tid}`,
       country: country || existing?.country || '',
-      senior_elo: res.senior.proElo,
-      u23_elo: res.u23.proElo,
-      u21_elo: res.u21.proElo,
-      u18_elo: res.u18.proElo,
-      senior_matches: res.senior.matchCount,
+      senior_elo: selfStats.senior,
+      u23_elo: selfStats.u23,
+      u21_elo: selfStats.u21,
+      u18_elo: selfStats.u18,
+      senior_matches: matches.length,
       last_scanned_at: nowIso,
       updated_at: nowIso
     };
