@@ -285,12 +285,24 @@ async function getStorageStats() {
     return null;
 }
 
-async function archiveAndPruneOldMatches(meta = {}) {
+// %80 ÇAPA & BUDAMA:
+// - Doluluk eşiğin ALTINDAYSA hiçbir maç silinmez.
+// - Eşik aşılınca anchor_and_prune() tek işlemde: o anki alex66 Pro-ELO puanlarını
+//   anchor_* sütunlarına mühürler, korunan pencereden eski maçları siler, kümülatif
+//   sayacı ve çift sayım filigranını (ind_min_date) günceller.
+// - "Bu Sezon" (91 gün) ve "Son 2 Ay" (60 gün) maçları ASLA silinmez.
+async function archiveAndPruneOldMatches() {
     assertEnv();
     const storageStats = await getStorageStats();
-    const currentPct = storageStats ? Number(storageStats.percent || 0) : 0;
-    if (storageStats) {
-        console.log(`[Depolama Durumu] Boyut: ${storageStats.db_size_mb} MB / ${storageStats.max_mb} MB (%${currentPct}) | Otomatik Çapa Eşiği: %${STORAGE_PRUNE_THRESHOLD_PCT}`);
+    if (!storageStats) {
+        console.log('[Depolama] İstatistik alınamadı — güvenlik için budama atlandı.');
+        return 0;
+    }
+    const currentPct = Number(storageStats.percent || 0);
+    console.log(`[Depolama] ${storageStats.db_size_mb} MB / ${storageStats.max_mb} MB (%${currentPct}) | Çapa eşiği: %${STORAGE_PRUNE_THRESHOLD_PCT}`);
+    if (currentPct < STORAGE_PRUNE_THRESHOLD_PCT) {
+        console.log('[Depolama] Eşiğin altında — hiçbir maç silinmedi.');
+        return 0;
     }
 
     const sInfo = getMzSeasonInfo();
@@ -306,29 +318,24 @@ async function archiveAndPruneOldMatches(meta = {}) {
     const cutoffStr = `${cutoffY}-${cutoffM}-${cutoffD} 00:00`;
 
     try {
-        const countRes = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?played_at=lt.${encodeURIComponent(cutoffStr)}&select=mid`, {
-            headers: getHeaders({ 'Prefer': 'count=exact', 'Range-Unit': 'items' })
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/anchor_and_prune`, {
+            method: 'POST',
+            headers: getHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ p_cutoff: cutoffStr })
         });
-        const range = countRes.headers.get('content-range');
-        const match = range ? range.match(/\/(\d+)/) : null;
-        const toDeleteCount = match ? parseInt(match[1], 10) : 0;
-
-        if (toDeleteCount > 0) {
-            console.log(`[Arşiv] ${cutoffStr} öncesine ait ${toDeleteCount} eski sezon maçı siliniyor ve arşive aktarılıyor...`);
-            const delRes = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?played_at=lt.${encodeURIComponent(cutoffStr)}`, {
-                method: 'DELETE',
-                headers: getHeaders({ 'Prefer': 'return=minimal' })
-            });
-            if (delRes.ok) {
-                const currentArchived = parseInt(meta.archived_matches_count || '0', 10);
-                const newArchived = currentArchived + toDeleteCount;
-                await upsertMeta({ archived_matches_count: String(newArchived) });
-                console.log(`[Arşiv] ✅ ${toDeleteCount} maç arşivlendi. Toplam arşivlenmiş maç: ${newArchived}`);
-                return toDeleteCount;
-            }
+        if (!res.ok) {
+            console.error(`[Çapa Hatası] HTTP ${res.status}: ${await res.text()}`);
+            return 0;
         }
+        const r = await res.json();
+        if (r.deleted > 0) {
+            console.log(`[Çapa] ✅ ${r.anchored} takımın puanı mühürlendi, ${cutoffStr} öncesi ${r.deleted} maç silindi. Toplam arşiv: ${r.archived_total}`);
+        } else {
+            console.log(`[Çapa] Eşik aşıldı ama ${cutoffStr} öncesinde silinecek maç yok (tüm maçlar korunan sezon/60 gün penceresinde).`);
+        }
+        return r.deleted || 0;
     } catch (err) {
-        console.error('[Arşiv Hatası]', err);
+        console.error('[Çapa Hatası]', err);
     }
     return 0;
 }

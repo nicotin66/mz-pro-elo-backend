@@ -168,7 +168,11 @@ async function main() {
     } catch (_) {
         console.log('[Bilgi] mz_meta tablosu henüz yok — sadece Model 1 (Hibrit) çalışacak.');
     }
-    const snapshotCutoff = meta.snapshot_cutoff || null;
+    // Çift sayım koruması: %80 çapa/budama sonrası silinen eski maçlar (ind_min_date öncesi)
+    // XML'de tekrar görünse bile ASLA yeniden işlenmez.
+    const baseCutoff = meta.snapshot_cutoff || null;
+    const indMinDate = meta.ind_min_date || null;
+    const snapshotCutoff = (baseCutoff && indMinDate && indMinDate > baseCutoff) ? indMinDate : baseCutoff;
 
     const queue = await pickQueue(hasV2);
     console.log(`[1/4] ${queue.length} AKTİF takım taranacak (top=${TOP_LIMIT}, indTop=${hasV2 ? IND_TOP_LIMIT : 0}, rotasyon=${ROTATE_LIMIT}, paralel=${CONCURRENCY}, çapa=${snapshotCutoff || 'YOK'})`);
@@ -549,8 +553,8 @@ async function main() {
             })
         });
 
-        // 91 günlük sezon ve 60 günlük periyot korumalı otomatik arşivleme
-        await archiveAndPruneOldMatches(meta);
+        // %80 doluluk eşiğinde çapa + budama (sezon 91 gün & son 60 gün korumalı)
+        await archiveAndPruneOldMatches();
     }
 
     console.log(`[4/4] ✅ TAMAMLANDI: ${hybridResults.size} hibrit takım | ${indScoredCount}/${indMatchRows.length} bağımsız maç | ${durationSec} sn`);
