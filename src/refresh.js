@@ -369,17 +369,17 @@ async function main() {
             dirtyTids.add(homeTid);
             dirtyTids.add(awayTid);
             indScoredCount++;
-        }
 
-        indMatchRows.push({
-            mid: m.mid,
-            played_at: String(m.date),
-            category: res.age,
-            home_tid: homeTid,
-            away_tid: awayTid,
-            home_delta: res.homeDelta,
-            away_delta: res.awayDelta
-        });
+            indMatchRows.push({
+                mid: m.mid,
+                played_at: String(m.date),
+                category: res.age,
+                home_tid: homeTid,
+                away_tid: awayTid,
+                home_delta: res.homeDelta,
+                away_delta: res.awayDelta
+            });
+        }
     }
 
     // Model 1 sonuçlarını güvenle birleştir (snap_* ve ind_* korunur!)
