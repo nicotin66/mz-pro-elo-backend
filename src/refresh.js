@@ -23,7 +23,8 @@ const {
     fetchIndProcessedMids,
     insertIndMatches,
     fetchMeta,
-    upsertMeta
+    upsertMeta,
+    archiveAndPruneOldMatches
 } = require('./supabaseClient');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co').replace(/\/+$/, '');
@@ -497,6 +498,9 @@ async function main() {
                 durationSec
             })
         });
+
+        // 91 günlük sezon ve 60 günlük periyot korumalı otomatik arşivleme
+        await archiveAndPruneOldMatches(meta);
     }
 
     console.log(`[4/4] ✅ TAMAMLANDI: ${hybridResults.size} hibrit takım | ${indScoredCount}/${indMatchRows.length} bağımsız maç | ${durationSec} sn`);

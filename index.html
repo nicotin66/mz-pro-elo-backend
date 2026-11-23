@@ -966,16 +966,22 @@
                     document.getElementById('stat-teams').textContent = `${scannedStr} / ${activeTeams.toLocaleString('tr-TR')}`;
                 }
 
+                const meta = {};
+                if (Array.isArray(metaRes)) {
+                    metaRes.forEach(r => { meta[r.key] = r.value; });
+                }
+
+                const archivedMatches = meta.archived_matches_count ? parseInt(meta.archived_matches_count, 10) : 0;
+                const totalScoredMatches = (indMatches || 0) + archivedMatches;
+
                 if (indMatches !== null) {
-                    document.getElementById('stat-matches').textContent = indMatches.toLocaleString('tr-TR');
+                    document.getElementById('stat-matches').textContent = totalScoredMatches.toLocaleString('tr-TR');
                 } else {
                     v2Ready = false;
                     document.getElementById('stat-matches').textContent = 'Kurulmadı';
                 }
 
                 if (Array.isArray(metaRes)) {
-                    const meta = {};
-                    metaRes.forEach(r => { meta[r.key] = r.value; });
                     document.getElementById('stat-last-run').textContent = fmtTrTime(meta.last_refresh_at);
                     if (meta.snapshot_cutoff) {
                         const snapTr = meta.snapshot_at_iso ? fmtTrTime(meta.snapshot_at_iso) : meta.snapshot_cutoff;

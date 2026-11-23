@@ -258,6 +258,60 @@ async function cleanupOldMatches() {
     }).catch(() => {});
 }
 
+function getMzSeasonInfo(date = new Date()) {
+    const baseDate = new Date('2026-09-29T00:00:00Z');
+    const targetDate = new Date(date.toISOString().split('T')[0] + 'T00:00:00Z');
+    const dayDiff = Math.round((targetDate - baseDate) / 86400000);
+    const season = 100 + Math.floor(dayDiff / 91);
+    const day = ((dayDiff % 91) + 91) % 91 + 1;
+    const week = Math.floor((day - 1) / 7) + 1;
+    const remainingDays = 91 - day;
+    const seasonStartDate = new Date(targetDate.getTime() - ((day - 1) * 86400000));
+    return { season, week, day, remainingDays, seasonStartDate };
+}
+
+async function archiveAndPruneOldMatches(meta = {}) {
+    assertEnv();
+    const sInfo = getMzSeasonInfo();
+    const seasonStart = sInfo.seasonStartDate;
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000);
+
+    // KORUMA: "Bu Sezon" (91 gün) ve "Son 2 Ay" (60 gün) maçlarını asla silme!
+    // Cutoff: seasonStart ve sixtyDaysAgo arasından DAHA ESKİ olanı seçilir.
+    const cutoffDate = seasonStart < sixtyDaysAgo ? seasonStart : sixtyDaysAgo;
+    const cutoffY = cutoffDate.getFullYear();
+    const cutoffM = String(cutoffDate.getMonth() + 1).padStart(2, '0');
+    const cutoffD = String(cutoffDate.getDate()).padStart(2, '0');
+    const cutoffStr = `${cutoffY}-${cutoffM}-${cutoffD} 00:00`;
+
+    try {
+        const countRes = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?played_at=lt.${encodeURIComponent(cutoffStr)}&select=mid`, {
+            headers: getHeaders({ 'Prefer': 'count=exact', 'Range-Unit': 'items' })
+        });
+        const range = countRes.headers.get('content-range');
+        const match = range ? range.match(/\/(\d+)/) : null;
+        const toDeleteCount = match ? parseInt(match[1], 10) : 0;
+
+        if (toDeleteCount > 0) {
+            console.log(`[Arşiv] ${cutoffStr} öncesine ait ${toDeleteCount} eski sezon maçı siliniyor ve arşive aktarılıyor...`);
+            const delRes = await fetch(`${SUPABASE_URL}/rest/v1/mz_ind_matches?played_at=lt.${encodeURIComponent(cutoffStr)}`, {
+                method: 'DELETE',
+                headers: getHeaders({ 'Prefer': 'return=minimal' })
+            });
+            if (delRes.ok) {
+                const currentArchived = parseInt(meta.archived_matches_count || '0', 10);
+                const newArchived = currentArchived + toDeleteCount;
+                await upsertMeta({ archived_matches_count: String(newArchived) });
+                console.log(`[Arşiv] ✅ ${toDeleteCount} maç arşivlendi. Toplam arşivlenmiş maç: ${newArchived}`);
+                return toDeleteCount;
+            }
+        }
+    } catch (err) {
+        console.error('[Arşiv Hatası]', err);
+    }
+    return 0;
+}
+
 module.exports = {
     upsertTeams,
     insertMissingTeams,
@@ -270,5 +324,7 @@ module.exports = {
     insertIndMatches,
     fetchMeta,
     upsertMeta,
-    cleanupOldMatches
+    cleanupOldMatches,
+    archiveAndPruneOldMatches,
+    getMzSeasonInfo
 };
