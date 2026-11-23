@@ -361,6 +361,9 @@ async function main() {
             awayRow[col] = Math.max(100, Number((awayElo + res.awayDelta).toFixed(2)));
             homeRow.ind_matches = (homeRow.ind_matches || 0) + 1;
             awayRow.ind_matches = (awayRow.ind_matches || 0) + 1;
+            const ageMatchCol = `ind_${age}_matches`;
+            homeRow[ageMatchCol] = (homeRow[ageMatchCol] || 0) + 1;
+            awayRow[ageMatchCol] = (awayRow[ageMatchCol] || 0) + 1;
             homeRow.updated_at = nowIso;
             awayRow.updated_at = nowIso;
             dirtyTids.add(homeTid);
@@ -433,6 +436,10 @@ async function main() {
             payload.ind_u21_elo = row.ind_u21_elo ?? null;
             payload.ind_u18_elo = row.ind_u18_elo ?? null;
             payload.ind_matches = row.ind_matches || 0;
+            payload.ind_senior_matches = row.ind_senior_matches || 0;
+            payload.ind_u23_matches = row.ind_u23_matches || 0;
+            payload.ind_u21_matches = row.ind_u21_matches || 0;
+            payload.ind_u18_matches = row.ind_u18_matches || 0;
         }
         rowsToUpsert.push(payload);
     }

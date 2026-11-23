@@ -1076,8 +1076,9 @@
             const wCol = `wleague_${currentAge}`;
             const orderCol = (v2Ready && sortMode === 'ind') ? indCol : hybCol;
 
+            const matchesCol = `ind_${currentAge}_matches`;
             const selectCols = v2Ready
-                ? `tid,name,country,${hybCol},${indCol},${snapCol},ind_matches,${natCol},${wCol}`
+                ? `tid,name,country,${hybCol},${indCol},${snapCol},${matchesCol},ind_matches,${natCol},${wCol}`
                 : `tid,name,country,${hybCol},${natCol},${wCol}`;
 
             let url = `${SUPABASE_URL}/rest/v1/mz_teams?select=${selectCols}&order=${orderCol}.desc.nullslast&limit=${PAGE_SIZE}&offset=${offset}`;
@@ -1154,7 +1155,8 @@
                     }
 
                     const countryBadge = renderCountryBadge(t.country);
-                    const indMatchesNote = (t.ind_matches && t.ind_matches > 0) ? ` • ${t.ind_matches} bağ. maç` : '';
+                    const catMatches = (t[matchesCol] != null) ? t[matchesCol] : (t.ind_matches || 0);
+                    const indMatchesNote = (catMatches && catMatches > 0) ? ` • ${catMatches} bağ. maç` : '';
                     const natLeague = t[natCol] || null;
                     const worldLeague = t[wCol] || null;
                     const leagueHtml = renderLeagueBadge(natLeague, worldLeague);
