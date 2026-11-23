@@ -270,7 +270,7 @@ function getMzSeasonInfo(date = new Date()) {
     return { season, week, day, remainingDays, seasonStartDate };
 }
 
-const STORAGE_PRUNE_THRESHOLD_PCT = parseInt(process.env.STORAGE_PRUNE_THRESHOLD_PCT || '50', 10);
+const STORAGE_PRUNE_THRESHOLD_PCT = parseInt(process.env.STORAGE_PRUNE_THRESHOLD_PCT || '80', 10);
 
 async function getStorageStats() {
     assertEnv();
