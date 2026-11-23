@@ -266,6 +266,78 @@ Deno.serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
+    const action = (url.searchParams.get('action') || '').toLowerCase();
+    const tidsParam = (url.searchParams.get('tids') || '').trim();
+
+    // ---- TOPLU LİG SEVİYESİ SORGULAMA (?action=leagues&tids=1247785,1004200) ----
+    if (action === 'leagues' || (tidsParam && !url.searchParams.get('tid') && !url.searchParams.get('username'))) {
+      const tids = tidsParam
+        .split(',')
+        .map(s => parseInt(s.trim(), 10))
+        .filter(n => !isNaN(n) && n > 0)
+        .slice(0, 50);
+
+      if (tids.length === 0) {
+        return new Response(JSON.stringify({ error: 'Geçerli tids parametresi gerekli' }), {
+          status: 400, headers: CORS_HEADERS
+        });
+      }
+
+      const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+      const leagueResults: Record<number, any> = {};
+      const dbUpdates: any[] = [];
+
+      await Promise.all(tids.map(async (tId) => {
+        try {
+          const res = await fetch(`https://www.managerzone.com/xml/team_matchlist.php?sport_id=1&team_id=${tId}&limit=25`);
+          if (!res.ok) return;
+          const xml = await res.text();
+          const { leagues, teamName, country } = parseMatchlistXml(xml, tId);
+          leagueResults[tId] = {
+            senior: { national: leagues.league_senior, world: leagues.wleague_senior },
+            u23: { national: leagues.league_u23, world: leagues.wleague_u23 },
+            u21: { national: leagues.league_u21, world: leagues.wleague_u21 },
+            u18: { national: leagues.league_u18, world: leagues.wleague_u18 }
+          };
+          if (leagues.league_senior || leagues.wleague_senior || leagues.league_u23 || leagues.league_u21 || leagues.league_u18) {
+            dbUpdates.push({
+              tid: tId,
+              name: teamName || undefined,
+              country: country || undefined,
+              league_senior: leagues.league_senior,
+              wleague_senior: leagues.wleague_senior,
+              league_u23: leagues.league_u23,
+              wleague_u23: leagues.wleague_u23,
+              league_u21: leagues.league_u21,
+              wleague_u21: leagues.wleague_u21,
+              league_u18: leagues.league_u18,
+              wleague_u18: leagues.wleague_u18
+            });
+          }
+        } catch (_) {}
+      }));
+
+      // Arka planda Supabase DB'ye kaydet
+      if (supabaseUrl && serviceKey && dbUpdates.length > 0) {
+        fetch(`${supabaseUrl}/rest/v1/mz_teams`, {
+          method: 'POST',
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(dbUpdates)
+        }).catch(() => {});
+      }
+
+      return new Response(JSON.stringify({ success: true, count: Object.keys(leagueResults).length, leagues: leagueResults }), {
+        status: 200, headers: CORS_HEADERS
+      });
+    }
+
     const tidStr = (url.searchParams.get('tid') || '').trim();
     const userParam = (url.searchParams.get('username') || url.searchParams.get('user') || '').trim();
     let tid = parseInt(tidStr, 10);

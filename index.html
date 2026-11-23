@@ -801,6 +801,63 @@
             </div>`;
         }
 
+        const leagueCache = new Map();
+        let resolveTimer = null;
+
+        function scheduleLeagueResolution() {
+            if (resolveTimer) clearTimeout(resolveTimer);
+            resolveTimer = setTimeout(() => {
+                resolveMissingLeaguesOnPage();
+            }, 60);
+        }
+
+        async function resolveMissingLeaguesOnPage() {
+            const missingCells = document.querySelectorAll('.league-cell[data-missing-league="true"]');
+            if (!missingCells.length) return;
+
+            const tidsToFetch = [];
+            missingCells.forEach(cell => {
+                const tid = cell.dataset.tid;
+                if (!tid) return;
+                const tidNum = Number(tid);
+                if (leagueCache.has(tidNum)) {
+                    const lg = leagueCache.get(tidNum);
+                    const lData = lg?.[currentAge] || lg?.senior || {};
+                    if (lData.national || lData.world) {
+                        cell.innerHTML = renderLeagueBadge(lData.national, lData.world);
+                        cell.removeAttribute('data-missing-league');
+                    }
+                } else {
+                    tidsToFetch.push(tid);
+                }
+            });
+
+            if (!tidsToFetch.length) return;
+
+            const uniqueTids = [...new Set(tidsToFetch)].slice(0, 50);
+            try {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/live-elo?action=leagues&tids=${uniqueTids.join(',')}`, {
+                    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data?.leagues) return;
+
+                for (const [tidStr, lgObj] of Object.entries(data.leagues)) {
+                    const tidNum = Number(tidStr);
+                    leagueCache.set(tidNum, lgObj);
+                    const cell = document.querySelector(`.league-cell[data-tid="${tidStr}"]`);
+                    if (cell) {
+                        const lData = lgObj?.[currentAge] || lgObj?.senior || {};
+                        if (lData.national || lData.world) {
+                            cell.innerHTML = renderLeagueBadge(lData.national, lData.world);
+                            cell.removeAttribute('data-missing-league');
+                        }
+                    }
+                }
+            } catch (_) {}
+        }
+
         function updateHeadersAndLegend() {
             const thead = document.getElementById('tableHead');
             const legend = document.getElementById('legendBar');
@@ -1112,6 +1169,8 @@
                         const fSign = fDelta > 0 ? `+${fDelta.toFixed(1)}` : fDelta.toFixed(1);
                         const fCls = fDelta > 0 ? 'color:#4ade80;' : (fDelta < 0 ? 'color:#f87171;' : 'color:#94a3b8;');
                         const countryBadge = renderCountryBadge(t.country);
+                        const hasLeague = Boolean(t.nat_league || t.world_league);
+                        const missingAttr = !hasLeague ? ' data-missing-league="true"' : '';
                         const leagueHtml = renderLeagueBadge(t.nat_league, t.world_league);
                         const mzLink = `https://www.managerzone.com/?p=team&tid=${t.tid}`;
 
@@ -1122,7 +1181,7 @@
                                 <a class="team-link" href="${mzLink}" target="_blank">${t.name || 'İsimsiz Kulüp'}</a>
                                 <div class="team-tid">ID: ${t.tid}${countryBadge}</div>
                             </td>
-                            <td>${leagueHtml}</td>
+                            <td class="league-cell" data-tid="${t.tid}"${missingAttr}>${leagueHtml}</td>
                             <td style="text-align: right;">
                                 <span class="elo-pill" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); font-weight:800; ${fCls}">
                                     ${fSign}
@@ -1140,6 +1199,8 @@
                         `;
                         tbody.appendChild(tr);
                     });
+
+                    scheduleLeagueResolution();
 
                     document.getElementById('pageInfo').textContent = `Sayfa ${currentPage} (Form Havuzu: ${total.toLocaleString('tr-TR')} takım)`;
                     document.getElementById('prevBtn').disabled = currentPage === 1;
@@ -1244,6 +1305,8 @@
                     const indMatchesNote = (catMatches && catMatches > 0) ? ` • ${catMatches} etki eden maç` : '';
                     const natLeague = t[natCol] || null;
                     const worldLeague = t[wCol] || null;
+                    const hasLeague = Boolean(natLeague || worldLeague);
+                    const missingAttr = !hasLeague ? ' data-missing-league="true"' : '';
                     const leagueHtml = renderLeagueBadge(natLeague, worldLeague);
                     const mzLink = `https://www.managerzone.com/?p=team&tid=${t.tid}`;
 
@@ -1254,7 +1317,7 @@
                             <a class="team-link" href="${mzLink}" target="_blank">${t.name || 'İsimsiz Kulüp'}</a>
                             <div class="team-tid">ID: ${t.tid}${countryBadge}${indMatchesNote}</div>
                         </td>
-                        <td>${leagueHtml}</td>
+                        <td class="league-cell" data-tid="${t.tid}"${missingAttr}>${leagueHtml}</td>
                         <td style="text-align: right;"><span class="elo-snap">${fmtNum(snapVal)}</span></td>
                         <td style="text-align: right;"><span class="elo-pill">${fmtNum(hybVal)}</span></td>
                         <td style="text-align: right;"><span class="elo-ind">${fmtNum(indVal)}</span></td>
@@ -1266,6 +1329,8 @@
                     `;
                     tbody.appendChild(tr);
                 });
+
+                scheduleLeagueResolution();
 
                 document.getElementById('pageInfo').textContent = `Sayfa ${currentPage} (Gösterilen: ${offset + 1} - ${offset + teams.length})`;
                 document.getElementById('prevBtn').disabled = currentPage === 1;
