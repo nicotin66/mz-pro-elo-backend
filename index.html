@@ -497,7 +497,7 @@
                     <span class="badge-live" id="seasonBadge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24;"></span>
                     <span class="badge-live" id="storageBadge" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: #38bdf8;"></span>
                 </h1>
-                <p><strong>Statsxente ELO</strong> ve <strong>18.11.2026 Bağımsız Pro-ELO</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
+                <p><strong>Statsxente ELO</strong> ve <strong>18.11.2026 alex66 Pro-ELO</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
             </div>
             <a href="https://github.com/nicotin66/mz-pro-elo-backend" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 12px; font-weight: 600;">
                 GitHub Deposu ↗
@@ -519,9 +519,9 @@
                 <div class="stat-desc">18.11 çapasından sonra puana etki eden resmi maçlar</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label" id="stat-top-label">Dünya #1 Senior</div>
+                <div class="stat-label" id="stat-top-label">Dünya #1 Senior (alex66)</div>
                 <div class="stat-value" id="stat-top-team" style="font-size: 18px; color: #fbbf24;">...</div>
-                <div class="stat-desc" id="stat-top-elo">Statsxente: ... • Bağımsız: ...</div>
+                <div class="stat-desc" id="stat-top-elo">Statsxente: ... • alex66: ...</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Son Güncelleme (TR)</div>
@@ -550,8 +550,8 @@
                 <button class="tab-btn" data-age="u18">🥇 U18</button>
             </div>
             <div class="sort-tabs">
-                <button class="sort-btn active-hybrid" id="sortHybridBtn">📊 Stats Sırala</button>
-                <button class="sort-btn" id="sortIndBtn">🧭 Bağımsız Sırala</button>
+                <button class="sort-btn" id="sortHybridBtn">📊 Stats Sırala</button>
+                <button class="sort-btn active-ind" id="sortIndBtn">👑 alex66 Sırala</button>
             </div>
             <div class="time-tabs">
                 <button class="time-btn active" data-days="0">🌐 Tüm Zamanlar</button>
@@ -576,7 +576,7 @@
         <div class="legend-bar" id="legendBar">
             <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
             <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan canlı Statsxente puanı</span>
-            <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
+            <span><span class="legend-dot" style="background:#34d399;"></span><strong>alex66 Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
         </div>
 
         <div class="table-wrap">
@@ -588,8 +588,8 @@
                         <th style="width: 175px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
                         <th style="width: 130px; text-align: right;">Statsxente ELO</th>
-                        <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
-                        <th style="width: 105px; text-align: right;">Fark (Bağ−Stats)</th>
+                        <th style="width: 140px; text-align: right;">alex66 Pro-ELO</th>
+                        <th style="width: 105px; text-align: right;">Fark (alex66−Stats)</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
                 </thead>
@@ -614,7 +614,7 @@
         const HEADERS = { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` };
 
         let currentAge = 'senior';
-        let sortMode = 'hybrid';
+        let sortMode = 'ind';
         let timePeriodDays = 0; // 0 = Tüm Zamanlar, 7 = 1 Hafta, 15 = 15 Gün, 30 = 1 Ay, 60 = 2 Ay
         let timePeriodMode = null; // 'season' | null
         let currentPage = 1;
@@ -821,7 +821,7 @@
                         <th style="width: 140px; text-align: right;">Form Değişim (${periodLabel})</th>
                         <th style="width: 115px; text-align: center;">Etki Eden Maç</th>
                         <th style="width: 130px; text-align: right;">Statsxente ELO</th>
-                        <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
+                        <th style="width: 140px; text-align: right;">alex66 Pro-ELO</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
                 `;
@@ -829,7 +829,7 @@
                     <span><span class="legend-dot" style="background:#fbbf24;"></span><strong>Sezon / Form Sıralaması:</strong> ${periodLabel} içinde oynanan ve puana etki eden resmi lig/kupa maçları (+ / - net Pro-ELO)</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan güncel Statsxente puanı</span>
-                    <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Güncel bağımsız çapa puanı</span>
+                    <span><span class="legend-dot" style="background:#34d399;"></span><strong>alex66 Pro-ELO:</strong> Güncel alex66 çapa puanı</span>
                 `;
             } else {
                 thead.innerHTML = `
@@ -839,8 +839,8 @@
                         <th style="width: 175px;">Lig Seviyesi</th>
                         <th style="width: 110px; text-align: right;">Çapa (18.11)</th>
                         <th style="width: 130px; text-align: right;">Statsxente ELO</th>
-                        <th style="width: 140px; text-align: right;">Bağımsız Pro-ELO</th>
-                        <th style="width: 105px; text-align: right;">Fark (Bağ−Stats)</th>
+                        <th style="width: 140px; text-align: right;">alex66 Pro-ELO</th>
+                        <th style="width: 105px; text-align: right;">Fark (alex66−Stats)</th>
                         <th style="width: 90px; text-align: center;">İşlem</th>
                     </tr>
                 `;
@@ -848,7 +848,7 @@
                     <span><span class="legend-dot" style="background:#94a3b8;"></span><strong>Çapa (18.11):</strong> Tek seferlik Statsxente başlangıç puanı</span>
                     <span><span class="legend-dot" style="background:#f59e0b;"></span><strong>Lig Renkleri:</strong> 👑 Süper Lig • 💎 Div 1 • 🌿 Div 2 • 🔮 Div 3 • ⚡ Div 4 • ⚙️ Div 5+</span>
                     <span><span class="legend-dot" style="background:#60a5fa;"></span><strong>Statsxente ELO:</strong> Takımın doğrudan canlı Statsxente puanı</span>
-                    <span><span class="legend-dot" style="background:#34d399;"></span><strong>Bağımsız Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
+                    <span><span class="legend-dot" style="background:#34d399;"></span><strong>alex66 Pro-ELO:</strong> Çapa üstüne sadece 18.11 sonrası kendi maçlarımız (Statsxente yok)</span>
                 `;
             }
         }
@@ -931,7 +931,7 @@
                         <div class="live-cat-box">
                             <div class="live-cat-title">${c.label}</div>
                             <div class="live-cat-nums"><span>Statsxente ELO:</span><strong style="color:#60a5fa;">${st}</strong></div>
-                            <div class="live-cat-nums"><span>Bağımsız Pro-ELO:</span><strong style="color:#34d399;">${ind}</strong></div>
+                            <div class="live-cat-nums"><span>alex66 Pro-ELO:</span><strong style="color:#34d399;">${ind}</strong></div>
                             ${lgHtml}
                         </div>
                     `;
@@ -1200,11 +1200,11 @@
 
                 if (currentPage === 1 && !trimmed) {
                     const ageLabel = currentAge.toUpperCase();
-                    const modeLabel = (v2Ready && sortMode === 'ind') ? 'Bağımsız' : 'Statsxente';
+                    const modeLabel = (v2Ready && sortMode === 'ind') ? 'alex66' : 'Statsxente';
                     document.getElementById('stat-top-label').textContent = `Dünya #1 ${ageLabel} (${modeLabel})`;
                     document.getElementById('stat-top-team').textContent = teams[0].name || `Takım #${teams[0].tid}`;
                     document.getElementById('stat-top-elo').textContent =
-                        `Statsxente: ${fmtNum(teams[0][hybCol])} • Bağımsız: ${fmtNum(teams[0][indCol])}`;
+                        `Statsxente: ${fmtNum(teams[0][hybCol])} • alex66: ${fmtNum(teams[0][indCol])}`;
                 }
 
                 // Arama yapıldığında her takımın gerçek dünya sırasını veritabanından hesapla
