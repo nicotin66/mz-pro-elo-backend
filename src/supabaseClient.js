@@ -270,8 +270,29 @@ function getMzSeasonInfo(date = new Date()) {
     return { season, week, day, remainingDays, seasonStartDate };
 }
 
+const STORAGE_PRUNE_THRESHOLD_PCT = parseInt(process.env.STORAGE_PRUNE_THRESHOLD_PCT || '50', 10);
+
+async function getStorageStats() {
+    assertEnv();
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_storage_stats`, {
+            method: 'POST',
+            headers: getHeaders({ 'Content-Type': 'application/json' }),
+            body: '{}'
+        });
+        if (res.ok) return await res.json();
+    } catch (_) {}
+    return null;
+}
+
 async function archiveAndPruneOldMatches(meta = {}) {
     assertEnv();
+    const storageStats = await getStorageStats();
+    const currentPct = storageStats ? Number(storageStats.percent || 0) : 0;
+    if (storageStats) {
+        console.log(`[Depolama Durumu] Boyut: ${storageStats.db_size_mb} MB / ${storageStats.max_mb} MB (%${currentPct}) | Otomatik Çapa Eşiği: %${STORAGE_PRUNE_THRESHOLD_PCT}`);
+    }
+
     const sInfo = getMzSeasonInfo();
     const seasonStart = sInfo.seasonStartDate;
     const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000);
@@ -326,5 +347,6 @@ module.exports = {
     upsertMeta,
     cleanupOldMatches,
     archiveAndPruneOldMatches,
+    getStorageStats,
     getMzSeasonInfo
 };
