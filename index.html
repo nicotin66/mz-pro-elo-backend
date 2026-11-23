@@ -495,6 +495,7 @@
                     <span>⚽ MZ Pro-ELO Çift-Model Laboratuvarı</span>
                     <span class="badge-live">100 Ülke • Anlık Motor</span>
                     <span class="badge-live" id="seasonBadge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24;"></span>
+                    <span class="badge-live" id="storageBadge" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: #38bdf8;"></span>
                 </h1>
                 <p><strong>Statsxente ELO</strong> ve <strong>18.11.2026 Bağımsız Pro-ELO</strong> yan yana • İstediğiniz takım ID'sini <strong>⚡ Canlı Hesapla</strong> ile 2 saniyede sorgulayın.</p>
             </div>
@@ -526,6 +527,18 @@
                 <div class="stat-label">Son Güncelleme (TR)</div>
                 <div class="stat-value" id="stat-last-run" style="color: #60a5fa; font-size: 19px;">...</div>
                 <div class="stat-desc" id="stat-snapshot-info">Çapa bilgisi yükleniyor...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Bulut Depolama (DB)</div>
+                <div class="stat-value" id="stat-storage-val" style="color: #38bdf8; font-size: 19px;">
+                    <span id="stat-storage-mb">... MB</span> <span id="stat-storage-pct" style="font-size: 13px; color: #94a3b8; font-weight: 600;">(%...)</span>
+                </div>
+                <div class="stat-desc" id="stat-storage-desc">
+                    <div style="background: rgba(255,255,255,0.08); border-radius: 9999px; height: 5px; width: 100%; margin: 6px 0 4px; overflow: hidden;">
+                        <div id="stat-storage-bar" style="background: #38bdf8; height: 100%; width: 0%; border-radius: 9999px; transition: width 0.3s;"></div>
+                    </div>
+                    <span id="stat-storage-sub" style="font-size: 11px; color: #94a3b8;">500 MB kotadan kalan hesaplanıyor...</span>
+                </div>
             </div>
         </div>
 
@@ -952,14 +965,38 @@
         async function fetchStatsAndMeta() {
             try {
                 const activeFilter = 'or=(snap_senior.not.is.null,snap_u23.not.is.null,snap_u21.not.is.null,snap_u18.not.is.null)';
-                const [activeTeams, scannedTeams, indMatches, metaRes] = await Promise.all([
+                const [activeTeams, scannedTeams, indMatches, metaRes, storageStats] = await Promise.all([
                     fetchCount(`mz_teams?select=tid&${activeFilter}&limit=1`),
                     fetchCount(`mz_teams?select=tid&${activeFilter}&last_scanned_at=not.is.null&limit=1`),
                     fetchCount('mz_ind_matches?select=mid&limit=1'),
                     fetch(`${SUPABASE_URL}/rest/v1/mz_meta?select=key,value`, { headers: HEADERS })
                         .then(r => r.ok ? r.json() : null)
-                        .catch(() => null)
+                        .catch(() => null),
+                    fetch(`${SUPABASE_URL}/rest/v1/rpc/get_storage_stats`, {
+                        method: 'POST',
+                        headers: { ...HEADERS, 'Content-Type': 'application/json' },
+                        body: '{}'
+                    }).then(r => r.ok ? r.json() : null).catch(() => null)
                 ]);
+
+                if (storageStats) {
+                    const mb = Number(storageStats.db_size_mb || 0);
+                    const maxMb = Number(storageStats.max_mb || 500);
+                    const pct = Number(storageStats.percent || 0);
+                    const freeMb = (maxMb - mb).toFixed(1);
+
+                    const mbEl = document.getElementById('stat-storage-mb');
+                    const pctEl = document.getElementById('stat-storage-pct');
+                    const barEl = document.getElementById('stat-storage-bar');
+                    const subEl = document.getElementById('stat-storage-sub');
+                    const badgeEl = document.getElementById('storageBadge');
+
+                    if (mbEl) mbEl.textContent = `${mb} MB`;
+                    if (pctEl) pctEl.textContent = `(%${pct})`;
+                    if (barEl) barEl.style.width = `${Math.min(pct, 100)}%`;
+                    if (subEl) subEl.textContent = `${maxMb} MB kotadan ${freeMb} MB boş`;
+                    if (badgeEl) badgeEl.innerHTML = `💾 ${mb} MB / ${maxMb} MB <span style="opacity:0.75;font-size:10px;">(%${pct})</span>`;
+                }
 
                 if (activeTeams !== null) {
                     const scannedStr = scannedTeams !== null ? scannedTeams.toLocaleString('tr-TR') : '?';
