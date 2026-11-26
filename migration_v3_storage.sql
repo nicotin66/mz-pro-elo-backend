@@ -114,3 +114,155 @@ AS $$
     'percent', ROUND(((pg_database_size(current_database())::numeric / (500 * 1024 * 1024)) * 100), 1)
   );
 $$;
+
+-- ===================== BÖLÜM 4: VERİ KAYIPSIZ SIKIŞTIRMA & OTOMATİK TEMİZLİK ================
+-- @@COMPRESSION_V4@@
+-- 1) Gereksiz home_tid / away_tid indekslerini kaldır (sorgular idx_mz_ind_matches_cat_played kullanıyor)
+DROP INDEX IF EXISTS public.idx_mz_ind_matches_home_tid;
+DROP INDEX IF EXISTS public.idx_mz_ind_matches_away_tid;
+
+-- 2) Hiç kullanılmayan processed_at sütununu kaldır ve sütun tiplerini veri kayıpsız küçült
+--    (BIGINT 8-byte -> INTEGER 4-byte, NUMERIC 8-byte -> REAL 4-byte)
+ALTER TABLE public.mz_ind_matches
+  DROP COLUMN IF EXISTS processed_at,
+  ALTER COLUMN mid TYPE INTEGER,
+  ALTER COLUMN home_tid TYPE INTEGER,
+  ALTER COLUMN away_tid TYPE INTEGER,
+  ALTER COLUMN home_delta TYPE REAL,
+  ALTER COLUMN away_delta TYPE REAL;
+
+-- 3) Otomatik Ölü Alan Temizliği (Autovacuum & HOT Update):
+--    PostgreSQL'in arka planda insan müdahalesi olmadan ölü alanları %5 eşiğinde
+--    otomatik temizlemesini ve takım güncellemelerini aynı sayfa içinde (HOT) yapmasını sağlar.
+ALTER TABLE public.mz_teams SET (
+  fillfactor = 85,
+  autovacuum_vacuum_scale_factor = 0.05,
+  autovacuum_analyze_scale_factor = 0.05
+);
+
+ALTER TABLE public.mz_ind_matches SET (
+  autovacuum_vacuum_scale_factor = 0.05,
+  autovacuum_analyze_scale_factor = 0.05
+);
+
+-- 4) Tek geçişli (LATERAL VALUES) ve 32MB RAM destekli hızlı get_form_rankings fonksiyonu
+CREATE OR REPLACE FUNCTION public.get_form_rankings(
+  p_category text DEFAULT 'senior'::text,
+  p_since text DEFAULT NULL::text,
+  p_search text DEFAULT NULL::text,
+  p_limit integer DEFAULT 50,
+  p_offset integer DEFAULT 0
+)
+RETURNS TABLE(
+  tid bigint,
+  name text,
+  country text,
+  form_delta numeric,
+  matches_count bigint,
+  hybrid_elo numeric,
+  ind_elo numeric,
+  snap_elo numeric,
+  nat_league text,
+  world_league text,
+  senior_league text,
+  senior_wleague text,
+  total_count bigint
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_search_num INTEGER;
+  v_has_search BOOLEAN := (p_search IS NOT NULL AND length(trim(p_search)) > 0);
+BEGIN
+  SET LOCAL work_mem = '32MB';
+
+  IF v_has_search AND p_search ~ '^[0-9]+$' THEN
+    v_search_num := p_search::INTEGER;
+  ELSE
+    v_search_num := NULL;
+  END IF;
+
+  RETURN QUERY
+  WITH team_agg AS (
+    SELECT
+      v.m_tid,
+      ROUND(SUM(v.delta)::numeric, 1) AS f_delta,
+      COUNT(*)::bigint AS f_matches
+    FROM public.mz_ind_matches im
+    CROSS JOIN LATERAL (
+      VALUES (im.home_tid, im.home_delta), (im.away_tid, im.away_delta)
+    ) AS v(m_tid, delta)
+    WHERE im.category = p_category
+      AND (p_since IS NULL OR im.played_at >= p_since)
+      AND (v_search_num IS NULL OR v.m_tid = v_search_num)
+    GROUP BY v.m_tid
+  ),
+  ranked AS (
+    SELECT
+      t.m_tid::bigint AS r_tid,
+      m.name AS r_name,
+      m.country AS r_country,
+      t.f_delta AS r_delta,
+      t.f_matches AS r_matches,
+      CASE p_category
+        WHEN 'u23' THEN m.u23_elo
+        WHEN 'u21' THEN m.u21_elo
+        WHEN 'u18' THEN m.u18_elo
+        ELSE m.senior_elo
+      END AS r_hybrid,
+      CASE p_category
+        WHEN 'u23' THEN m.ind_u23_elo
+        WHEN 'u21' THEN m.ind_u21_elo
+        WHEN 'u18' THEN m.ind_u18_elo
+        ELSE m.ind_senior_elo
+      END AS r_ind,
+      CASE p_category
+        WHEN 'u23' THEN m.snap_u23
+        WHEN 'u21' THEN m.snap_u21
+        WHEN 'u18' THEN m.snap_u18
+        ELSE m.snap_senior
+      END AS r_snap,
+      CASE p_category
+        WHEN 'u23' THEN m.league_u23
+        WHEN 'u21' THEN m.league_u21
+        WHEN 'u18' THEN m.league_u18
+        ELSE m.league_senior
+      END AS r_nat_league,
+      CASE p_category
+        WHEN 'u23' THEN m.wleague_u23
+        WHEN 'u21' THEN m.wleague_u21
+        WHEN 'u18' THEN m.wleague_u18
+        ELSE m.wleague_senior
+      END AS r_world_league,
+      m.league_senior AS r_senior_league,
+      m.wleague_senior AS r_senior_wleague,
+      COUNT(*) OVER() AS r_total
+    FROM team_agg t
+    JOIN public.mz_teams m ON m.tid = t.m_tid
+    WHERE (
+      NOT v_has_search
+      OR (v_search_num IS NOT NULL AND m.tid = v_search_num)
+      OR (v_search_num IS NULL AND m.name ILIKE ('%' || p_search || '%'))
+    )
+  )
+  SELECT
+    r_tid,
+    r_name,
+    r_country,
+    r_delta,
+    r_matches,
+    r_hybrid,
+    r_ind,
+    r_snap,
+    r_nat_league,
+    r_world_league,
+    r_senior_league,
+    r_senior_wleague,
+    r_total
+  FROM ranked
+  ORDER BY r_delta DESC, r_matches DESC, r_tid ASC
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$function$;
