@@ -481,3 +481,147 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_country_power_rankings(TEXT, INTEGER) TO anon, authenticated, service_role;
+
+
+-- ===================== BÖLÜM 6: GİZLİ YÖNETİCİ ZİYARETÇİ ANALİTİĞİ ================
+-- @@ADMIN_ANALYTICS_V1@@
+
+CREATE TABLE IF NOT EXISTS public.mz_site_visits (
+  id BIGSERIAL PRIMARY KEY,
+  visitor_id TEXT NOT NULL,
+  visited_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  visit_date TEXT NOT NULL,
+  device TEXT,
+  os TEXT,
+  browser TEXT,
+  tz TEXT,
+  lang TEXT,
+  referrer TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_mz_site_visits_date ON public.mz_site_visits (visit_date);
+CREATE INDEX IF NOT EXISTS idx_mz_site_visits_visitor ON public.mz_site_visits (visitor_id);
+
+-- RLS Aktif: Dışarıdan anonim kullanıcılar ziyaretçi kayıtlarını ASLA okuyamaz!
+ALTER TABLE public.mz_site_visits ENABLE ROW LEVEL SECURITY;
+
+-- Varsayılan admin PIN (mz_meta tablosundan istenildiği zaman değiştirilebilir)
+INSERT INTO public.mz_meta (key, value, updated_at)
+VALUES
+  ('admin_pin', 'alex66', NOW()),
+  ('site_total_views', '0', NOW())
+ON CONFLICT (key) DO NOTHING;
+
+-- Anonim ziyaret kaydı (Sadece yazma, son 30 günü korur, veritabanını şişirmez)
+CREATE OR REPLACE FUNCTION public.log_site_visit(
+  p_visitor_id TEXT,
+  p_device TEXT DEFAULT NULL,
+  p_os TEXT DEFAULT NULL,
+  p_browser TEXT DEFAULT NULL,
+  p_tz TEXT DEFAULT NULL,
+  p_lang TEXT DEFAULT NULL,
+  p_referrer TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_today TEXT := to_char(NOW() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD');
+BEGIN
+  IF p_visitor_id IS NULL OR length(trim(p_visitor_id)) < 4 THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO public.mz_site_visits (visitor_id, visited_at, visit_date, device, os, browser, tz, lang, referrer)
+  VALUES (
+    left(trim(p_visitor_id), 64),
+    NOW(),
+    v_today,
+    left(COALESCE(p_device, ''), 32),
+    left(COALESCE(p_os, ''), 32),
+    left(COALESCE(p_browser, ''), 32),
+    left(COALESCE(p_tz, ''), 64),
+    left(COALESCE(p_lang, ''), 16),
+    left(COALESCE(p_referrer, ''), 120)
+  );
+
+  INSERT INTO public.mz_meta (key, value, updated_at)
+  VALUES ('site_total_views', '1', NOW())
+  ON CONFLICT (key) DO UPDATE
+    SET value = (COALESCE(NULLIF(public.mz_meta.value, '')::BIGINT, 0) + 1)::TEXT,
+        updated_at = NOW();
+
+  -- 30 günden eski ziyaret satırlarını temizle (toplam sayaç mz_meta'da kalıcıdır)
+  DELETE FROM public.mz_site_visits WHERE visited_at < NOW() - interval '30 days';
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.log_site_visit(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- Yalnızca doğru Admin PIN ile çalışan ziyaretçi istatistik fonksiyonu
+CREATE OR REPLACE FUNCTION public.get_admin_visit_stats(p_pin TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_real_pin TEXT;
+  v_today TEXT := to_char(NOW() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD');
+  v_total_views BIGINT;
+  v_total_unique BIGINT;
+  v_today_views BIGINT;
+  v_today_unique BIGINT;
+  v_daily JSONB;
+  v_recent JSONB;
+BEGIN
+  SELECT value INTO v_real_pin FROM public.mz_meta WHERE key = 'admin_pin';
+  IF v_real_pin IS NULL OR p_pin IS NULL OR p_pin <> v_real_pin THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Geçersiz yönetici şifresi');
+  END IF;
+
+  SELECT COALESCE(NULLIF(value, '')::BIGINT, 0) INTO v_total_views FROM public.mz_meta WHERE key = 'site_total_views';
+  SELECT COUNT(DISTINCT visitor_id) INTO v_total_unique FROM public.mz_site_visits;
+  SELECT COUNT(*), COUNT(DISTINCT visitor_id) INTO v_today_views, v_today_unique
+  FROM public.mz_site_visits WHERE visit_date = v_today;
+
+  SELECT COALESCE(jsonb_agg(row_to_json(d) ORDER BY d.visit_date DESC), '[]'::jsonb)
+  INTO v_daily
+  FROM (
+    SELECT visit_date, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS unique_visitors
+    FROM public.mz_site_visits
+    WHERE visited_at >= NOW() - interval '7 days'
+    GROUP BY visit_date
+  ) d;
+
+  SELECT COALESCE(jsonb_agg(row_to_json(r)), '[]'::jsonb)
+  INTO v_recent
+  FROM (
+    SELECT
+      visited_at,
+      left(visitor_id, 8) AS visitor_code,
+      device,
+      os,
+      browser,
+      tz,
+      lang,
+      referrer,
+      (SELECT COUNT(*) FROM public.mz_site_visits s2 WHERE s2.visitor_id = s1.visitor_id) AS user_total_visits
+    FROM public.mz_site_visits s1
+    ORDER BY visited_at DESC
+    LIMIT 40
+  ) r;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'total_views', COALESCE(v_total_views, 0),
+    'total_unique_30d', COALESCE(v_total_unique, 0),
+    'today_views', COALESCE(v_today_views, 0),
+    'today_unique', COALESCE(v_today_unique, 0),
+    'daily_7d', v_daily,
+    'recent', v_recent
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_admin_visit_stats(TEXT) TO anon, authenticated, service_role;
