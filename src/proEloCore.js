@@ -96,8 +96,9 @@ function toScriptMatches(rawMatches, tid) {
 }
 
 function getKPro(mType, mTypeName, typeName, defaultLeagueMult = 0.80) {
-    if (mType.includes('friendly')) return 10;
-    if (mType.includes('private_cup')) return 10;
+    // Özel kupa ve dostluk ligi katsayısı 6'ya çekildi (resmi lig/kupa maçlarını ezmemesi için)
+    if (mType.includes('friendly')) return 6;
+    if (mType.includes('private_cup')) return 6;
     if (mType.includes('cup_playoff') || mTypeName.includes('final') || mTypeName.includes('semi') || mTypeName.includes('quarter') || mTypeName.includes('playoff') || mTypeName.includes('1/')) {
         if (mTypeName.includes('final') && !mTypeName.includes('semi') && !mTypeName.includes('quarter')) return 50;
         if (mTypeName.includes('semi') || mTypeName.includes('quarter')) return 45;
@@ -112,6 +113,13 @@ function getKPro(mType, mTypeName, typeName, defaultLeagueMult = 0.80) {
         return 15;
     }
     return null; // ELO'ya dahil edilmez
+}
+
+// 1900+ puan üstü yumuşak tavan (Enflasyon Freni):
+// 1900'de 1.00x, 2000'de 0.71x, 2050'de 0.625x ile sezon içi puan şişmesini önler
+function getHighEloSoftFactor(rating) {
+    if (rating <= 1900) return 1.0;
+    return 1.0 / (1.0 + ((rating - 1900) / 250.0));
 }
 
 // =====================================================================
@@ -156,9 +164,10 @@ function computeProElo(statsElo, matches, oppElos = {}) {
             const statsK = isFriendlySeries ? 10 : (mType.includes('private_cup') ? 15 : 30);
             const statsDelta = statsK * (actual - expected);
             let proDelta = kPro * gMult * (actual - expected);
+            if (proDelta > 0) proDelta *= getHighEloSoftFactor(baseElo);
 
             const isPlayoff = mType.includes('cup_playoff') || mType.includes('playoff') || mType.includes('private_cup_playoff');
-            if (isPlayoff && actual < 0.5) proDelta = 0;
+            if (isPlayoff && actual < 0.5 && proDelta < 0) proDelta = proDelta * 0.25;
 
             officialNetDiff += (proDelta - statsDelta);
         });
@@ -210,11 +219,15 @@ function computeIndependentMatchDelta(homeElo, awayElo, homeGoals, awayGoals, ra
     let homeDelta = kPro * gMult * (actualHome - expHome);
     let awayDelta = -homeDelta;
 
-    // FIFA Eleme Koruması: Eleme maçında kaybedene 0 ceza
+    // 1900+ puan üstü yumuşak tavan (Enflasyon Freni — sadece pozitif artışları yumuşatır)
+    if (homeDelta > 0) homeDelta *= getHighEloSoftFactor(homeElo);
+    if (awayDelta > 0) awayDelta *= getHighEloSoftFactor(awayElo);
+
+    // Eleme Koruması + Enflasyon Dengesi: Eleme maçında kaybedene 0 yerine 0.25x hafif ceza
     const isPlayoff = mType.includes('cup_playoff') || mType.includes('playoff') || mType.includes('private_cup_playoff');
     if (isPlayoff) {
-        if (actualHome < 0.5 && homeDelta < 0) homeDelta = 0;
-        if (actualHome > 0.5 && awayDelta < 0) awayDelta = 0;
+        if (actualHome < 0.5 && homeDelta < 0) homeDelta = homeDelta * 0.25;
+        if (actualHome > 0.5 && awayDelta < 0) awayDelta = awayDelta * 0.25;
     }
 
     return {

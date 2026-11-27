@@ -340,6 +340,28 @@ async function archiveAndPruneOldMatches() {
     return 0;
 }
 
+async function applyInactivityDecay() {
+    assertEnv();
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/apply_inactivity_decay`, {
+            method: 'POST',
+            headers: getHeaders({ 'Content-Type': 'application/json' }),
+            body: '{}'
+        });
+        if (!res.ok) {
+            console.log(`[İnaktivite] RPC yanıt vermedi (${res.status}) — atlandı.`);
+            return null;
+        }
+        const r = await res.json();
+        if (r && r.applied) {
+            console.log(`[İnaktivite] ✅ ${r.decayed_teams || 0} pasif/banlı takımın puanına günlük -0.25 ELO düşüşü uygulandı.`);
+        }
+        return r;
+    } catch (_) {
+        return null;
+    }
+}
+
 module.exports = {
     upsertTeams,
     insertMissingTeams,
@@ -354,6 +376,7 @@ module.exports = {
     upsertMeta,
     cleanupOldMatches,
     archiveAndPruneOldMatches,
+    applyInactivityDecay,
     getStorageStats,
     getMzSeasonInfo
 };

@@ -274,3 +274,210 @@ BEGIN
   OFFSET p_offset;
 END;
 $function$;
+
+
+-- ===================== BÖLÜM 5: PRO-ELO v4 ANALİTİK & İNAKTİVİTE RPC'LERİ ================
+-- @@PRO_ELO_V4_RPCS@@
+
+-- 1) 21+ Gün Pasif / Banlı Takım Düşüşü (Günde en fazla 1 kez çalışır, hiçbir veriyi silmez)
+CREATE OR REPLACE FUNCTION public.apply_inactivity_decay()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_today TEXT := to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD');
+  v_last_decay TEXT;
+  v_cutoff TEXT;
+  v_decayed BIGINT := 0;
+BEGIN
+  -- 18.11.2026 çapasından itibaren en az 21 gün geçmeden düşüş başlatma
+  IF NOW() < ('2026-11-18T00:00:00Z'::timestamptz + interval '21 days') THEN
+    RETURN jsonb_build_object('applied', false, 'reason', 'warmup_21d');
+  END IF;
+
+  SELECT value INTO v_last_decay FROM public.mz_meta WHERE key = 'last_decay_date';
+  IF v_last_decay = v_today THEN
+    RETURN jsonb_build_object('applied', false, 'reason', 'already_applied_today');
+  END IF;
+
+  v_cutoff := to_char((NOW() AT TIME ZONE 'Europe/Stockholm') - interval '21 days', 'YYYY-MM-DD HH24:MI');
+
+  WITH active_tids AS (
+    SELECT DISTINCT v.tid
+    FROM public.mz_ind_matches im
+    CROSS JOIN LATERAL (VALUES (im.home_tid), (im.away_tid)) AS v(tid)
+    WHERE im.played_at >= v_cutoff
+  )
+  UPDATE public.mz_teams t
+  SET
+    ind_senior_elo = CASE WHEN t.ind_senior_elo IS NOT NULL AND t.ind_senior_elo > 1200 THEN GREATEST(1200, ROUND((t.ind_senior_elo - 0.25)::numeric, 1)) ELSE t.ind_senior_elo END,
+    ind_u23_elo    = CASE WHEN t.ind_u23_elo    IS NOT NULL AND t.ind_u23_elo    > 1200 THEN GREATEST(1200, ROUND((t.ind_u23_elo    - 0.25)::numeric, 1)) ELSE t.ind_u23_elo    END,
+    ind_u21_elo    = CASE WHEN t.ind_u21_elo    IS NOT NULL AND t.ind_u21_elo    > 1200 THEN GREATEST(1200, ROUND((t.ind_u21_elo    - 0.25)::numeric, 1)) ELSE t.ind_u21_elo    END,
+    ind_u18_elo    = CASE WHEN t.ind_u18_elo    IS NOT NULL AND t.ind_u18_elo    > 1200 THEN GREATEST(1200, ROUND((t.ind_u18_elo    - 0.25)::numeric, 1)) ELSE t.ind_u18_elo    END
+  WHERE (t.ind_senior_elo IS NOT NULL OR t.ind_u23_elo IS NOT NULL OR t.ind_u21_elo IS NOT NULL OR t.ind_u18_elo IS NOT NULL)
+    AND NOT EXISTS (SELECT 1 FROM active_tids a WHERE a.tid = t.tid);
+
+  GET DIAGNOSTICS v_decayed = ROW_COUNT;
+
+  INSERT INTO public.mz_meta (key, value, updated_at)
+  VALUES ('last_decay_date', v_today, NOW())
+  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;
+
+  RETURN jsonb_build_object('applied', true, 'decayed_teams', v_decayed, 'date', v_today, 'cutoff', v_cutoff);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.apply_inactivity_decay() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_inactivity_decay() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_inactivity_decay() TO service_role;
+
+-- 2) Takım Günlük ELO Gelişim Grafiği (18.11 çapasından bugüne)
+CREATE OR REPLACE FUNCTION public.get_team_elo_history(
+  p_tid INTEGER,
+  p_category TEXT DEFAULT 'senior'
+)
+RETURNS TABLE(
+  match_date TEXT,
+  elo NUMERIC,
+  day_delta NUMERIC,
+  matches_count INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_snap NUMERIC;
+  v_curr NUMERIC;
+  v_total_delta NUMERIC;
+  v_start_elo NUMERIC;
+BEGIN
+  SELECT
+    CASE p_category
+      WHEN 'u23' THEN t.snap_u23
+      WHEN 'u21' THEN t.snap_u21
+      WHEN 'u18' THEN t.snap_u18
+      ELSE t.snap_senior
+    END,
+    CASE p_category
+      WHEN 'u23' THEN t.ind_u23_elo
+      WHEN 'u21' THEN t.ind_u21_elo
+      WHEN 'u18' THEN t.ind_u18_elo
+      ELSE t.ind_senior_elo
+    END
+  INTO v_snap, v_curr
+  FROM public.mz_teams t
+  WHERE t.tid = p_tid;
+
+  IF v_curr IS NULL AND v_snap IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(SUM(
+    CASE WHEN im.home_tid = p_tid THEN im.home_delta ELSE im.away_delta END
+  ), 0)::numeric
+  INTO v_total_delta
+  FROM public.mz_ind_matches im
+  WHERE im.category = p_category
+    AND (im.home_tid = p_tid OR im.away_tid = p_tid);
+
+  v_start_elo := COALESCE(v_snap, COALESCE(v_curr, 1500) - v_total_delta);
+
+  RETURN QUERY
+  WITH daily AS (
+    SELECT
+      SUBSTRING(im.played_at, 1, 10) AS d_str,
+      ROUND(SUM(CASE WHEN im.home_tid = p_tid THEN im.home_delta ELSE im.away_delta END)::numeric, 1) AS d_delta,
+      COUNT(*)::INTEGER AS d_cnt
+    FROM public.mz_ind_matches im
+    WHERE im.category = p_category
+      AND (im.home_tid = p_tid OR im.away_tid = p_tid)
+    GROUP BY SUBSTRING(im.played_at, 1, 10)
+  ),
+  running AS (
+    SELECT
+      d.d_str,
+      ROUND((v_start_elo + SUM(d.d_delta) OVER (ORDER BY d.d_str ASC))::numeric, 1) AS cum_elo,
+      d.d_delta,
+      d.d_cnt
+    FROM daily d
+  )
+  SELECT '2026-11-18'::TEXT, ROUND(v_start_elo, 1), 0::NUMERIC, 0::INTEGER
+  UNION ALL
+  SELECT r.d_str, r.cum_elo, r.d_delta, r.d_cnt
+  FROM running r
+  ORDER BY 1 ASC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_team_elo_history(INTEGER, TEXT) TO anon, authenticated, service_role;
+
+-- 3) Ülkeler Güç Sıralaması (Her Ülkenin En İyi 100 Kulübünün Ortalama Pro-ELO'su)
+CREATE OR REPLACE FUNCTION public.get_country_power_rankings(
+  p_category TEXT DEFAULT 'senior',
+  p_top_n INTEGER DEFAULT 100
+)
+RETURNS TABLE(
+  country TEXT,
+  avg_ind_elo NUMERIC,
+  avg_stats_elo NUMERIC,
+  team_count BIGINT,
+  counted_teams INTEGER,
+  top_team_tid BIGINT,
+  top_team_name TEXT,
+  top_team_elo NUMERIC
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH base AS (
+    SELECT
+      UPPER(TRIM(t.country)) AS cc,
+      t.tid::BIGINT AS tid,
+      t.name AS tname,
+      CASE p_category
+        WHEN 'u23' THEN t.ind_u23_elo
+        WHEN 'u21' THEN t.ind_u21_elo
+        WHEN 'u18' THEN t.ind_u18_elo
+        ELSE t.ind_senior_elo
+      END AS i_elo,
+      CASE p_category
+        WHEN 'u23' THEN t.u23_elo
+        WHEN 'u21' THEN t.u21_elo
+        WHEN 'u18' THEN t.u18_elo
+        ELSE t.senior_elo
+      END AS s_elo
+    FROM public.mz_teams t
+    WHERE t.country IS NOT NULL AND length(TRIM(t.country)) = 2
+  ),
+  ranked AS (
+    SELECT
+      b.cc,
+      b.tid,
+      b.tname,
+      b.i_elo,
+      b.s_elo,
+      ROW_NUMBER() OVER (PARTITION BY b.cc ORDER BY b.i_elo DESC NULLS LAST) AS rn,
+      COUNT(*) OVER (PARTITION BY b.cc) AS total_cnt
+    FROM base b
+    WHERE b.i_elo IS NOT NULL
+  )
+  SELECT
+    r.cc AS country,
+    ROUND(AVG(r.i_elo)::numeric, 1) AS avg_ind_elo,
+    ROUND(AVG(r.s_elo)::numeric, 1) AS avg_stats_elo,
+    MAX(r.total_cnt)::BIGINT AS team_count,
+    COUNT(*)::INTEGER AS counted_teams,
+    MAX(CASE WHEN r.rn = 1 THEN r.tid END)::BIGINT AS top_team_tid,
+    MAX(CASE WHEN r.rn = 1 THEN r.tname END)::TEXT AS top_team_name,
+    MAX(CASE WHEN r.rn = 1 THEN r.i_elo END)::NUMERIC AS top_team_elo
+  FROM ranked r
+  WHERE r.rn <= GREATEST(1, COALESCE(p_top_n, 100))
+  GROUP BY r.cc
+  ORDER BY avg_ind_elo DESC NULLS LAST;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_country_power_rankings(TEXT, INTEGER) TO anon, authenticated, service_role;

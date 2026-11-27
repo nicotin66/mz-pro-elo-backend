@@ -24,7 +24,8 @@ const {
     insertIndMatches,
     fetchMeta,
     upsertMeta,
-    archiveAndPruneOldMatches
+    archiveAndPruneOldMatches,
+    applyInactivityDecay
 } = require('./supabaseClient');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bggydqalllytcqwxsypj.supabase.co').replace(/\/+$/, '');
@@ -552,6 +553,9 @@ async function main() {
                 durationSec
             })
         });
+
+        // 21+ gün resmi maç oynamayan / banlı takımlara günde 1 kez hafif düşüş (-0.25 ELO/gün)
+        await applyInactivityDecay();
 
         // %80 doluluk eşiğinde çapa + budama (sezon 91 gün & son 60 gün korumalı)
         await archiveAndPruneOldMatches();

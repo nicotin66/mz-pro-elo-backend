@@ -67,8 +67,8 @@ function classifyCategory(rawType: string, typeName: string): 'senior' | 'u23' |
 }
 
 function getKPro(mType: string, mTypeName: string, typeName: string): number | null {
-  if (mType.includes('friendly')) return 10;
-  if (mType.includes('private_cup')) return 10;
+  if (mType.includes('friendly')) return 6;
+  if (mType.includes('private_cup')) return 6;
   if (mType.includes('cup_playoff') || mTypeName.includes('final') || mTypeName.includes('semi') || mTypeName.includes('quarter') || mTypeName.includes('playoff') || mTypeName.includes('1/')) {
     if (mTypeName.includes('final') && !mTypeName.includes('semi') && !mTypeName.includes('quarter')) return 50;
     if (mTypeName.includes('semi') || mTypeName.includes('quarter')) return 45;
@@ -83,6 +83,11 @@ function getKPro(mType: string, mTypeName: string, typeName: string): number | n
     return 15;
   }
   return null;
+}
+
+function getHighEloSoftFactor(rating: number): number {
+  if (rating <= 1900) return 1.0;
+  return 1.0 / (1.0 + ((rating - 1900) / 250.0));
 }
 
 interface ParsedMatch {
@@ -243,8 +248,9 @@ function computeHybrid(statsElo: EloSet, matches: ParsedMatch[], oppElos: Record
       const statsK = isFriendlySeries ? 10 : (m.type.includes('private_cup') ? 15 : 30);
       const statsDelta = statsK * (actual - expected);
       let proDelta = kPro * gMult * (actual - expected);
+      if (proDelta > 0) proDelta *= getHighEloSoftFactor(baseElo);
       const isPlayoff = m.type.includes('cup_playoff') || m.type.includes('playoff') || m.type.includes('private_cup_playoff');
-      if (isPlayoff && actual < 0.5) proDelta = 0;
+      if (isPlayoff && actual < 0.5 && proDelta < 0) proDelta = proDelta * 0.25;
       netDiff += (proDelta - statsDelta);
     }
     const diff = Math.round(netDiff * 10) / 10;
