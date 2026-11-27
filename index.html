@@ -1852,7 +1852,7 @@
                     return;
                 }
 
-                if (currentPage === 1 && !trimmed) {
+                if (currentPage === 1 && !trimmed && viewMode === 'teams' && !selectedCountry && !onlySuperLeague) {
                     const ageLabel = currentAge.toUpperCase();
                     const modeLabel = (v2Ready && sortMode === 'ind') ? 'alex66' : 'Statsxente';
                     document.getElementById('stat-top-label').textContent = `Dünya #1 ${ageLabel} (${modeLabel})`;
@@ -1861,9 +1861,10 @@
                         `Statsxente: ${fmtNum(teams[0][hybCol])} • alex66: ${fmtNum(teams[0][indCol])}`;
                 }
 
-                // Arama yapıldığında her takımın gerçek dünya sırasını veritabanından hesapla
+                // Arama veya Favorilerim modunda her takımın seçili kategorideki (Senior/U23/U21/U18) gerçek dünya sırasını hesapla
+                const needRealWorldRank = Boolean(trimmed || viewMode === 'favorites');
                 let realRanks = null;
-                if (trimmed) {
+                if (needRealWorldRank) {
                     realRanks = await Promise.all(teams.map(async (t) => {
                         const v = t[orderCol];
                         if (v === null || v === undefined) return null;
@@ -1874,7 +1875,7 @@
 
                 tbody.innerHTML = '';
                 teams.forEach((t, i) => {
-                    const globalRank = trimmed ? realRanks[i] : (offset + i + 1);
+                    const globalRank = needRealWorldRank ? realRanks[i] : (offset + i + 1);
                     let rankBadge = '<span class="rank-badge rank-other">—</span>';
                     if (globalRank === 1) rankBadge = `<span class="rank-badge rank-1">1 🥇</span>`;
                     else if (globalRank === 2) rankBadge = `<span class="rank-badge rank-2">2 🥈</span>`;
