@@ -107,12 +107,20 @@ RETURNS JSONB
 LANGUAGE sql
 SECURITY DEFINER
 AS $$
+  WITH sizes AS (
+    SELECT
+      pg_database_size(current_database())::numeric AS db_bytes,
+      COALESCE(pg_total_relation_size('public.mz_ind_matches'::regclass), 0)::numeric AS matches_bytes
+  )
   SELECT jsonb_build_object(
-    'db_bytes', pg_database_size(current_database()),
-    'db_size_mb', ROUND((pg_database_size(current_database())::numeric / (1024*1024)), 1),
+    'db_bytes', db_bytes,
+    'db_size_mb', ROUND((db_bytes / (1024*1024)), 1),
+    'matches_mb', ROUND((matches_bytes / (1024*1024)), 1),
+    'base_mb', ROUND(((db_bytes - matches_bytes) / (1024*1024)), 1),
     'max_mb', 500,
-    'percent', ROUND(((pg_database_size(current_database())::numeric / (500 * 1024 * 1024)) * 100), 1)
-  );
+    'percent', ROUND(((db_bytes / (500 * 1024 * 1024)) * 100), 1)
+  )
+  FROM sizes;
 $$;
 
 -- ===================== BÖLÜM 4: VERİ KAYIPSIZ SIKIŞTIRMA & OTOMATİK TEMİZLİK ================

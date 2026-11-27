@@ -1024,11 +1024,39 @@
                     }).then(r => r.ok ? r.json() : null).catch(() => null)
                 ]);
 
+                const meta = {};
+                if (Array.isArray(metaRes)) {
+                    metaRes.forEach(r => { meta[r.key] = r.value; });
+                }
+
                 if (storageStats) {
                     const mb = Number(storageStats.db_size_mb || 0);
                     const maxMb = Number(storageStats.max_mb || 500);
                     const pct = Number(storageStats.percent || 0);
                     const freeMb = (maxMb - mb).toFixed(1);
+
+                    // Ana hafıza (PostgreSQL sistem + mz_teams sabit tablo) hariç maçların tükettiği MB
+                    const baseMb = storageStats.base_mb !== undefined ? Number(storageStats.base_mb) : 21.4;
+                    const matchesMb = storageStats.matches_mb !== undefined ? Number(storageStats.matches_mb) : Math.max(0.1, +(mb - baseMb).toFixed(1));
+                    const usableQuotaMb = Math.max(10, maxMb - baseMb);
+
+                    // Son çapa / başlangıç zamanını tespit et (Varsayılan: 18.11.2026 09:21 TR)
+                    const rawAnchorIso = meta.last_anchor_at || meta.snapshot_at_iso || '2026-11-18T06:21:00Z';
+                    const anchorMs = new Date(rawAnchorIso).getTime() || new Date('2026-11-18T06:21:00Z').getTime();
+                    const elapsedExactDays = Math.max(0.1, (Date.now() - anchorMs) / 86400000);
+                    const elapsedDays = Math.max(1, Math.floor(elapsedExactDays));
+
+                    // Günlük ortalama maç verisi tüketimi (MB/gün) ve toplam/kalan gün tahmini
+                    const dailyMatchMb = matchesMb > 0 ? (matchesMb / elapsedExactDays) : 0;
+                    let daysHtml = '';
+                    let tooltipText = `Toplam: ${mb} MB / ${maxMb} MB (%${pct})`;
+
+                    if (dailyMatchMb > 0.05) {
+                        const totalEstDays = Math.max(elapsedDays, Math.round(usableQuotaMb / dailyMatchMb));
+                        const remainingEstDays = Math.max(0, totalEstDays - elapsedDays);
+                        daysHtml = ` • <span style="color:#a7f3d0;font-weight:800;">⏳ ${elapsedDays}/${remainingEstDays}/${totalEstDays} Gün</span>`;
+                        tooltipText = `Ana Hafıza (Sistem+Takımlar): ${baseMb.toFixed(1)} MB | Maç Verisi: ${matchesMb.toFixed(1)} MB (~${dailyMatchMb.toFixed(2)} MB/gün) | Geçen: ${elapsedDays} Gün | Kalan: ${remainingEstDays} Gün | Toplam Tahmini Hafıza Ömrü: ${totalEstDays} Gün`;
+                    }
 
                     const mbEl = document.getElementById('stat-storage-mb');
                     const pctEl = document.getElementById('stat-storage-pct');
@@ -1040,17 +1068,15 @@
                     if (pctEl) pctEl.textContent = `(%${pct})`;
                     if (barEl) barEl.style.width = `${Math.min(pct, 100)}%`;
                     if (subEl) subEl.textContent = `${maxMb} MB kotadan ${freeMb} MB boş`;
-                    if (badgeEl) badgeEl.innerHTML = `💾 ${mb} MB / ${maxMb} MB <span style="opacity:0.75;font-size:10px;">(%${pct})</span>`;
+                    if (badgeEl) {
+                        badgeEl.title = tooltipText;
+                        badgeEl.innerHTML = `💾 ${mb} MB / ${maxMb} MB <span style="opacity:0.75;font-size:10px;">(%${pct})</span>${daysHtml}`;
+                    }
                 }
 
                 if (activeTeams !== null) {
                     const scannedStr = scannedTeams !== null ? scannedTeams.toLocaleString('tr-TR') : '?';
                     document.getElementById('stat-teams').textContent = `${scannedStr} / ${activeTeams.toLocaleString('tr-TR')}`;
-                }
-
-                const meta = {};
-                if (Array.isArray(metaRes)) {
-                    metaRes.forEach(r => { meta[r.key] = r.value; });
                 }
 
                 const archivedMatches = meta.archived_matches_count ? parseInt(meta.archived_matches_count, 10) : 0;
